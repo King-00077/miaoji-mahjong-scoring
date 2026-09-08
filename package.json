@@ -1,0 +1,19 @@
+{
+  "name": "zuizi-mahjong-scoring",
+  "version": "2.0.0",
+  "description": "嘴子麻将计分器 - WebToApp版",
+  "main": "server.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "keywords": ["mahjong", "scoring", "麻将计分"],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "lowdb": "^7.0.1",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "ws": "^8.21.1"
+  }
+}

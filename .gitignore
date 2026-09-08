@@ -1,0 +1,27 @@
+# 运行时数据（不提交）
+settlementHistory.json
+gameState.json
+users.json
+gameLogs.json
+
+# 日志
+*.log
+*.err.log
+
+# 备份文件
+*.bak
+*.bak.*
+
+# TTS 缓存
+tts_cache/
+
+# 依赖
+node_modules/
+
+# 环境变量
+.env
+.env.local
+
+# 系统文件
+.DS_Store
+Thumbs.db

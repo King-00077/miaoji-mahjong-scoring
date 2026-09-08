@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>妙计分 - 启动器</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        .launcher {
+            background: #fff; border-radius: 18px; padding: 32px 26px;
+            width: 100%; max-width: 380px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .logo { font-size: 2.8rem; color: #667eea; margin-bottom: 10px; }
+        h1 { font-size: 1.4rem; color: #333; margin-bottom: 6px; }
+        .subtitle { font-size: 0.85rem; color: #888; margin-bottom: 22px; line-height: 1.6; }
+        .spinner {
+            width: 46px; height: 46px; margin: 0 auto 16px;
+            border: 4px solid #eee; border-top: 4px solid #667eea;
+            border-radius: 50%; animation: spin 0.9s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .status { font-size: 0.92rem; color: #555; margin-bottom: 6px; }
+        .addr { font-size: 0.8rem; color: #999; margin-bottom: 18px; word-break: break-all; }
+        .progress-bar {
+            height: 4px; background: #eee; border-radius: 2px; overflow: hidden; margin-bottom: 18px;
+        }
+        .progress-fill {
+            height: 100%; width: 0%; background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.2s linear;
+        }
+        .input-group { display: flex; gap: 8px; margin-bottom: 14px; }
+        input[type="text"] {
+            flex: 1; padding: 12px 14px; border: 2px solid #e0e0e0; border-radius: 10px;
+            font-size: 0.98rem; outline: none; transition: border-color 0.2s;
+        }
+        input[type="text"]:focus { border-color: #667eea; }
+        .btn {
+            width: 100%; padding: 13px; border: none; border-radius: 10px;
+            font-size: 1rem; font-weight: bold; cursor: pointer; margin-bottom: 10px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2); color: #fff;
+            box-shadow: 0 4px 14px rgba(102,126,234,0.4);
+        }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-ghost { background: #f0f2f5; color: #555; }
+        .btn-connect {
+            width: auto; padding: 12px 20px; margin: 0; white-space: nowrap;
+            background: linear-gradient(135deg, #667eea, #764ba2); color: #fff;
+        }
+        .hint {
+            font-size: 0.78rem; color: #999; margin-top: 14px; line-height: 1.6;
+            background: #f8f9fa; padding: 12px; border-radius: 10px; text-align: left;
+        }
+        .hint b { color: #666; }
+        .error-box {
+            background: #fdecea; color: #c62828; padding: 12px; border-radius: 10px;
+            font-size: 0.85rem; margin-bottom: 16px; display: none;
+        }
+        .hidden { display: none !important; }
+        .footer { margin-top: 18px; font-size: 0.72rem; color: #bbb; }
+    </style>
+</head>
+<body>
+    <div class="launcher">
+        <div class="logo"><i class="fas fa-mahjong" aria-hidden="true"></i> <i class="fas fa-trophy" aria-hidden="true"></i></div>
+        <h1>妙计分</h1>
+        <div class="subtitle">宇宙无敌至尊Pro Max 2.0版</div>
+
+        <!-- 连接中状态 -->
+        <div id="connectingView">
+            <div class="spinner"></div>
+            <div class="status" id="connectStatus">正在连接服务器...</div>
+            <div class="addr" id="connectAddr"></div>
+            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+            <button class="btn btn-ghost" id="cancelBtn">取消，手动输入地址</button>
+        </div>
+
+        <!-- 手动连接界面 -->
+        <div id="manualView" class="hidden">
+            <div class="error-box" id="errorBox"></div>
+            <div class="status" style="text-align:left; margin-bottom:8px; font-size:0.85rem; color:#555;">服务器地址</div>
+            <div class="input-group">
+                <input type="text" id="serverAddrInput" placeholder="例如 47.109.52.139:2525" autocomplete="off">
+                <button class="btn btn-connect" id="connectBtn">连接</button>
+            </div>
+            <button class="btn btn-ghost" id="retryDefaultBtn">使用默认地址重试</button>
+            <div class="hint">
+                <b>说明</b><br>
+                • 默认已内置服务器地址，通常会自动进入<br>
+                • 连不上时（超过10秒）会出现此界面<br>
+                • 手机与服务器需在同一网络，或服务器已开放公网端口
+            </div>
+        </div>
+
+        <div class="footer">嘴子麻将计分器 · 启动器</div>
+    </div>
+
+    <script>
+        // ===== 内置服务器地址 =====
+        // 若本文件由服务器提供（http/https 打开），默认地址即当前站点
+        // 若通过 file:// 本地打开，则使用下方内置地址（可改）
+        var BUILTIN_SERVER = '47.109.52.139:2525';
+        var LS_KEY = 'miaoji_launcher_addr';
+        var CONNECT_TIMEOUT = 10; // 秒：超过则回落到手动连接界面
+
+        function getDefaultAddr() {
+            if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+                return window.location.host; // 服务器自身地址
+            }
+            try {
+                var saved = localStorage.getItem(LS_KEY);
+                if (saved) return saved;
+            } catch (e) {}
+            return BUILTIN_SERVER;
+        }
+
+        function normalizeAddr(addr) {
+            addr = (addr || '').trim();
+            addr = addr.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+            if (!addr) return '';
+            if (addr.indexOf(':') === -1) addr += ':2525'; // 未填端口则用默认端口
+            return addr;
+        }
+
+        var connectingView = document.getElementById('connectingView');
+        var manualView = document.getElementById('manualView');
+        var statusEl = document.getElementById('connectStatus');
+        var addrEl = document.getElementById('connectAddr');
+        var progressEl = document.getElementById('progressFill');
+        var errorBox = document.getElementById('errorBox');
+        var inputEl = document.getElementById('serverAddrInput');
+        var probeTimer = null;
+        var progressTimer = null;
+        var aborted = false;
+
+        function showManual(msg) {
+            stopTimers();
+            connectingView.classList.add('hidden');
+            manualView.classList.remove('hidden');
+            if (msg) {
+                errorBox.style.display = 'block';
+                errorBox.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + msg;
+            }
+            if (!inputEl.value) inputEl.value = getDefaultAddr();
+            inputEl.focus();
+        }
+
+        function stopTimers() {
+            if (probeTimer) { clearTimeout(probeTimer); probeTimer = null; }
+            if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+        }
+
+        // 探测服务器是否可达（HTTP /api/server-info）
+        function probe(addr) {
+            return new Promise(function (resolve) {
+                var done = false;
+                var ctrl = null;
+                if (typeof AbortController !== 'undefined') ctrl = new AbortController();
+                var t = setTimeout(function () { if (!done) { done = true; resolve(false); } }, 6000);
+                var opts = { cache: 'no-store' };
+                if (ctrl) opts.signal = ctrl.signal;
+                fetch('http://' + addr + '/api/server-info', opts).then(function (r) {
+                    if (!done) { done = true; clearTimeout(t); resolve(r.ok); }
+                }).catch(function () {
+                    if (!done) { done = true; clearTimeout(t); resolve(false); }
+                });
+            });
+        }
+
+        // 自动连接：连接成功则跳转至计分页面
+        function autoConnect() {
+            var addr = normalizeAddr(getDefaultAddr());
+            if (!addr) { showManual('未配置服务器地址'); return; }
+            aborted = false;
+            connectingView.classList.remove('hidden');
+            manualView.classList.add('hidden');
+            errorBox.style.display = 'none';
+            addrEl.textContent = 'http://' + addr;
+            statusEl.textContent = '正在连接服务器...';
+
+            // 进度条动画（10秒）
+            var elapsed = 0;
+            progressEl.style.width = '0%';
+            progressTimer = setInterval(function () {
+                elapsed += 0.1;
+                var pct = Math.min(100, (elapsed / CONNECT_TIMEOUT) * 100);
+                progressEl.style.width = pct + '%';
+            }, 100);
+
+            // 超时保护：超过10秒回落到手动界面
+            probeTimer = setTimeout(function () {
+                if (!aborted) showManual('连接超时（超过 ' + CONNECT_TIMEOUT + ' 秒），请检查网络或手动输入地址');
+            }, CONNECT_TIMEOUT * 1000);
+
+            probe(addr).then(function (ok) {
+                if (aborted) return;
+                if (ok) {
+                    stopTimers();
+                    try { localStorage.setItem(LS_KEY, addr); } catch (e) {}
+                    statusEl.textContent = '连接成功，正在进入...';
+                    progressEl.style.width = '100%';
+                    setTimeout(function () {
+                        window.location.href = 'http://' + addr + '/';
+                    }, 400);
+                } else {
+                    showManual('无法连接到服务器 ' + addr);
+                }
+            });
+        }
+
+        document.getElementById('cancelBtn').addEventListener('click', function () {
+            aborted = true;
+            stopTimers();
+            showManual('');
+        });
+
+        document.getElementById('connectBtn').addEventListener('click', function () {
+            var addr = normalizeAddr(inputEl.value);
+            if (!addr) { showManual('请输入服务器地址'); return; }
+            connectingView.classList.remove('hidden');
+            manualView.classList.add('hidden');
+            addrEl.textContent = 'http://' + addr;
+            statusEl.textContent = '正在连接服务器...';
+            progressEl.style.width = '40%';
+            aborted = false;
+            probe(addr).then(function (ok) {
+                if (aborted) return;
+                if (ok) {
+                    try { localStorage.setItem(LS_KEY, addr); } catch (e) {}
+                    statusEl.textContent = '连接成功，正在进入...';
+                    progressEl.style.width = '100%';
+                    setTimeout(function () { window.location.href = 'http://' + addr + '/'; }, 400);
+                } else {
+                    showManual('无法连接到服务器 ' + addr + '<br>请确认地址与端口是否正确');
+                }
+            });
+        });
+
+        document.getElementById('retryDefaultBtn').addEventListener('click', function () {
+            inputEl.value = getDefaultAddr();
+            autoConnect();
+        });
+
+        inputEl.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') document.getElementById('connectBtn').click();
+        });
+
+        // 启动即自动连接
+        autoConnect();
+    </script>
+</body>
+</html>
