@@ -4836,6 +4836,24 @@ body.guest-mode .manual-score-btn {
                             // 如果历史面板正在显示，刷新它
                             const offlineBody = document.getElementById('offlineHistoryBody');
                             if (offlineBody) renderOfflineSettlementHistory(offlineBody);
+                            // 同时刷新在线历史面板（多端备注同步）
+                            try {
+                                const onlineBody = document.getElementById('settlementHistoryBody');
+                                if (onlineBody && onlineBody.innerHTML && !onlineBody.querySelector('.no-settlement-history')) {
+                                    renderSettlementHistory();
+                                }
+                            } catch(e) { console.warn('刷新在线历史面板失败:', e); }
+                            // 如果结算详情弹窗打开着，同步更新备注
+                            try {
+                                if (window._currentDetailSettlement && data.settlements) {
+                                    const updated = data.settlements.find(function(s) { return s.id === window._currentDetailSettlement.id; });
+                                    if (updated) {
+                                        window._currentDetailSettlement.remark = updated.remark || '';
+                                        const detailInput = document.getElementById('detailRemarkInput');
+                                        if (detailInput) detailInput.value = updated.remark || '';
+                                    }
+                                }
+                            } catch(e) { console.warn('同步详情弹窗备注失败:', e); }
                         }
                     } catch(e) {
                         console.error('保存同步的历史结算数据失败:', e);
@@ -8452,6 +8470,58 @@ body.guest-mode .manual-score-btn {
                 console.error('更新本地结算备注失败:', e);
             }
         }
+
+        // ===== 备注离线待同步队列 =====
+        const PENDING_REMARK_KEY = 'pending_remark_sync';
+        function getPendingRemarkQueue() {
+            try {
+                const raw = localStorage.getItem(PENDING_REMARK_KEY);
+                return raw ? JSON.parse(raw) : [];
+            } catch(e) { return []; }
+        }
+        function savePendingRemarkQueue(arr) {
+            try { localStorage.setItem(PENDING_REMARK_KEY, JSON.stringify(arr)); } catch(e) {}
+        }
+        // 保存备注：先写本地，在线则上传，离线则加入待同步队列
+        async function saveRemarkWithSync(id, remark) {
+            updateLocalSettlementRemark(id, remark);
+            // 加入待同步队列（去重，只保留最新）
+            let queue = getPendingRemarkQueue().filter(function(x) { return x.id !== id; });
+            queue.push({ id: id, remark: remark, time: Date.now() });
+            savePendingRemarkQueue(queue);
+            // 尝试上传到云端
+            try {
+                const resp = await fetch('/api/update-settlement-remark', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id, remark: remark })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    // 上传成功，从队列移除
+                    queue = getPendingRemarkQueue().filter(function(x) { return x.id !== id; });
+                    savePendingRemarkQueue(queue);
+                    return true;
+                }
+                return false;
+            } catch(e) {
+                console.log('备注离线保存，将在联网后自动同步:', e);
+                return false;
+            }
+        }
+        // 批量同步所有待同步备注
+        async function syncAllPendingRemarks() {
+            const queue = getPendingRemarkQueue();
+            if (queue.length === 0) return;
+            console.log('开始同步 ' + queue.length + ' 条待同步备注...');
+            for (const item of queue) {
+                await saveRemarkWithSync(item.id, item.remark);
+            }
+        }
+        // 监听网络恢复，自动同步
+        window.addEventListener('online', function() { syncAllPendingRemarks(); });
+        // 页面加载时尝试同步
+        document.addEventListener('DOMContentLoaded', function() { setTimeout(syncAllPendingRemarks, 2000); });
         
         // 生成结算详情
         // 生成结算详情 - 2x2布局
@@ -9188,9 +9258,10 @@ body.guest-mode .manual-score-btn {
                 const trimmed = newRemark.trim().substring(0, 200);
 
             if (isOffline) {
-                updateLocalSettlementRemark(settlementId, trimmed);
+                saveRemarkWithSync(settlementId, trimmed);
                 const container = document.getElementById('offlineHistoryBody');
                 if (container) renderOfflineSettlementHistory(container);
+                showNotification('备注已保存，联网后自动同步', 'success', 2000);
             } else {
                 fetch('/api/update-settlement-remark', {
                     method: 'POST',
@@ -9890,6 +9961,7 @@ body.guest-mode .manual-score-btn {
 
         // 显示结算详情弹窗 —— 完全使用DOM API，不用innerHTML构建内容
         function showSettlementDetail(settlement) {
+            window._currentDetailSettlement = settlement;
             if (!settlement || typeof settlement !== 'object') { showNotification('结算数据无效', 'error', 3000); return; }
             if (!settlement.players || !Array.isArray(settlement.players) || settlement.players.length === 0) { showNotification('结算玩家数据无效', 'error', 3000); return; }
             if (!settlement.history || !Array.isArray(settlement.history)) settlement.history = [];
@@ -9914,6 +9986,7 @@ body.guest-mode .manual-score-btn {
             modal._isClosed = false;
 
             function closeModal() {
+                window._currentDetailSettlement = null;
                 modal._isClosed = true;
                 if (chartInstance) { try { chartInstance.destroy(); } catch(e){} chartInstance = null; }
                 if (modal.parentNode) modal.parentNode.removeChild(modal);
@@ -10037,13 +10110,13 @@ body.guest-mode .manual-score-btn {
                         var timeoutId = setTimeout(function() { controller.abort(); }, 3000);
                         var response = await fetch('/api/update-settlement-remark', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: settlement.id, remark: remark }), signal: controller.signal });
                         clearTimeout(timeoutId);
-                        if (response.ok) { settlement.remark = remark; remarkBtn.textContent = '已保存'; showNotification('备注已保存', 'success', 2000); }
+                        if (response.ok) { settlement.remark = remark; remarkBtn.textContent = '已保存'; showNotification('备注已保存', 'success', 2000); try { renderSettlementHistory(); } catch(e) {} }
                         else throw new Error('API failed');
                     } catch(e) {
-                        updateLocalSettlementRemark(settlement.id, remark);
+                        saveRemarkWithSync(settlement.id, remark);
                         settlement.remark = remark;
                         remarkBtn.textContent = '已保存';
-                        showNotification('备注已保存到本地', 'success', 2000);
+                        showNotification('备注已保存，联网后自动同步', 'success', 2000);
                     }
                     setTimeout(function() { remarkBtn.disabled = false; remarkBtn.textContent = '保存'; }, 1500);
                 };
