@@ -1,0 +1,51 @@
+<!--pages/ranking/ranking.wxml-->
+<view class="ranking-container">
+  <!-- 排序切换 -->
+  <view class="sort-tabs">
+    <view class="sort-tab {{sortBy === 'totalScore' ? 'active' : ''}}" bindtap="switchSort" data-sort="totalScore">
+      按总分
+    </view>
+    <view class="sort-tab {{sortBy === 'winRate' ? 'active' : ''}}" bindtap="switchSort" data-sort="winRate">
+      按胜率
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading">
+    <text>加载中...</text>
+  </view>
+
+  <view wx:elif="{{list.length === 0}}" class="empty-state">
+    <text class="icon">🏆</text>
+    <text>暂无排行榜数据</text>
+    <text class="hint">注册账号并完成结算后上榜</text>
+  </view>
+
+  <view wx:else class="ranking-list">
+    <view class="rank-item card {{index < 3 ? 'top-' + (index + 1) : ''}}" wx:for="{{list}}" wx:key="userId" bindtap="goStats" data-userid="{{item.userId}}">
+      <view class="rank-num">
+        <text wx:if="{{index === 0}}">🥇</text>
+        <text wx:elif="{{index === 1}}">🥈</text>
+        <text wx:elif="{{index === 2}}">🥉</text>
+        <text wx:else>{{index + 1}}</text>
+      </view>
+      <view class="rank-info">
+        <text class="rank-name">{{item.nickname}}</text>
+        <text class="rank-id">{{item.userId}}</text>
+      </view>
+      <view class="rank-stats">
+        <view class="stat-col">
+          <text class="stat-val {{sortBy === 'totalScore' ? 'highlight' : ''}}">{{item.totalScore > 0 ? '+' : ''}}{{item.totalScore || 0}}</text>
+          <text class="stat-label">总分</text>
+        </view>
+        <view class="stat-col">
+          <text class="stat-val {{sortBy === 'winRate' ? 'highlight' : ''}}">{{item.winRate || '0%'}}</text>
+          <text class="stat-label">胜率</text>
+        </view>
+        <view class="stat-col">
+          <text class="stat-val">{{item.totalRounds || 0}}</text>
+          <text class="stat-label">局数</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

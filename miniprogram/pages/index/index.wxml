@@ -1,0 +1,99 @@
+<!--pages/index/index.wxml-->
+<view class="index-container">
+  <!-- 顶部状态栏 -->
+  <view class="top-bar">
+    <view class="connection-status {{socketConnected ? 'connected' : 'disconnected'}}">
+      <text class="status-dot"></text>
+      <text>{{socketConnected ? '已连接' : '连接中...'}}</text>
+    </view>
+    <view class="user-info" bindtap="goStats">
+      <text class="user-nickname">{{userInfo.nickname || '未登录'}}</text>
+      <text class="user-id" wx:if="{{userInfo.userId}}">{{userInfo.userId}}</text>
+    </view>
+  </view>
+
+  <!-- 游戏状态区 -->
+  <view class="game-status card">
+    <view class="status-row">
+      <text class="status-label">当前局数：</text>
+      <text class="status-value">{{gameState.round || 0}}</text>
+    </view>
+    <view class="status-row">
+      <text class="status-label">庄家：</text>
+      <text class="status-value">{{gameState.banker || '未确定'}}</text>
+    </view>
+  </view>
+
+  <!-- 玩家卡片区域 -->
+  <view class="players-area">
+    <view class="player-card card {{item.isBanker ? 'banker' : ''}}" wx:for="{{players}}" wx:key="id">
+      <view class="player-header">
+        <text class="player-name">{{item.nickname || item.name}}</text>
+        <text class="banker-tag" wx:if="{{item.isBanker}}">庄</text>
+      </view>
+      <view class="player-score {{item.score > 0 ? 'score-positive' : item.score < 0 ? 'score-negative' : ''}}">
+        {{item.score > 0 ? '+' : ''}}{{item.score || 0}}
+      </view>
+      <view class="player-actions">
+        <button class="score-btn score-add" size="mini" bindtap="onAddScore" data-id="{{item.id}}">+</button>
+        <button class="score-btn score-sub" size="mini" bindtap="onSubScore" data-id="{{item.id}}">-</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 操作按钮区 -->
+  <view class="action-area">
+    <button class="btn-primary action-btn" bindtap="onSettlement">
+      结算本局
+    </button>
+    <button class="btn-secondary action-btn" bindtap="onNewGame">
+      新的一局
+    </button>
+  </view>
+
+  <!-- 结算弹窗 -->
+  <view wx:if="{{showSettlement}}" class="modal-mask" bindtap="hideSettlementModal">
+    <view class="modal-content settlement-modal" catchtap="">
+      <view class="modal-header">
+        <text class="modal-title">本局结算</text>
+      </view>
+      <view class="modal-body">
+        <view class="settlement-item" wx:for="{{players}}" wx:key="id">
+          <text class="settlement-name">{{item.nickname || item.name}}</text>
+          <text class="settlement-score {{item.score > 0 ? 'score-positive' : item.score < 0 ? 'score-negative' : ''}}">
+            {{item.score > 0 ? '+' : ''}}{{item.score || 0}}
+          </text>
+        </view>
+        <view class="form-item">
+          <text class="form-label">结算备注（可选）</text>
+          <input class="input-field" type="text" placeholder="输入备注" maxlength="200" value="{{settlementRemark}}" bindinput="onRemarkInput" />
+        </view>
+      </view>
+      <view class="modal-footer">
+        <button class="btn-secondary modal-btn" bindtap="hideSettlementModal">取消</button>
+        <button class="btn-primary modal-btn" bindtap="onConfirmSettlement" loading="{{settlementLoading}}">确认结算</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 收款码弹窗 -->
+  <view wx:if="{{showPayQrcode}}" class="modal-mask" bindtap="hidePayQrcode">
+    <view class="modal-content" catchtap="">
+      <view class="modal-header">
+        <text class="modal-title">对局结算完成，请转账</text>
+      </view>
+      <view class="modal-body pay-body">
+        <image wx:if="{{payQrcode}}" class="pay-qrcode" src="{{payQrcode}}" mode="aspectFit" show-menu-by-longpress />
+        <view wx:else class="no-qrcode">
+          <text>未设置收款码</text>
+          <text class="qrcode-hint">可在"我的"页面上传收款码</text>
+        </view>
+        <text class="pay-tip">长按图片保存，点击按钮打开微信扫一扫</text>
+      </view>
+      <view class="modal-footer">
+        <button class="btn-secondary modal-btn" bindtap="hidePayQrcode">关闭</button>
+        <button class="btn-primary modal-btn" bindtap="onOpenWechatScan">唤起微信扫一扫</button>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,162 @@
+/* pages/detail/detail.wxss */
+.detail-container {
+  padding: 20rpx;
+  padding-bottom: 40rpx;
+}
+
+.loading {
+  text-align: center;
+  padding: 100rpx 0;
+  color: #999;
+}
+
+/* 概览区 */
+.overview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.overview-time {
+  font-size: 26rpx;
+  color: #888;
+}
+
+.overview-round {
+  font-size: 24rpx;
+  color: #667eea;
+  background: #eef2ff;
+  padding: 6rpx 20rpx;
+  border-radius: 20rpx;
+}
+
+.remark-area {
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.remark-input {
+  flex: 1;
+  padding: 16rpx 20rpx;
+  border: 2rpx solid #e0e0e0;
+  border-radius: 10rpx;
+  font-size: 26rpx;
+}
+
+.remark-btn {
+  background: #667eea;
+  color: #fff;
+  font-size: 24rpx;
+  padding: 0 24rpx;
+}
+
+/* 玩家统计 */
+.section-title {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #333;
+  margin: 30rpx 0 16rpx;
+  padding-left: 8rpx;
+}
+
+.player-stat-card {
+  margin-bottom: 16rpx;
+}
+
+.stat-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+  padding-bottom: 12rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.stat-name {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.stat-score {
+  font-size: 36rpx;
+  font-weight: bold;
+}
+
+.stat-score.positive {
+  color: #e74c3c;
+}
+
+.stat-score.negative {
+  color: #27ae60;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8rpx;
+}
+
+.stat-cell {
+  text-align: center;
+  background: #f8f9ff;
+  border-radius: 8rpx;
+  padding: 12rpx 4rpx;
+}
+
+.stat-val {
+  display: block;
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #1a6dcc;
+}
+
+.stat-label {
+  display: block;
+  font-size: 20rpx;
+  color: #888;
+  margin-top: 4rpx;
+}
+
+/* 对局明细 */
+.history-item {
+  padding: 16rpx 20rpx;
+  margin-bottom: 12rpx;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+}
+
+.history-label {
+  font-size: 26rpx;
+  font-weight: bold;
+  color: #667eea;
+  margin-right: 16rpx;
+  min-width: 80rpx;
+}
+
+.history-desc {
+  font-size: 26rpx;
+  color: #555;
+  flex: 1;
+}
+
+/* 删除按钮 */
+.delete-area {
+  margin-top: 40rpx;
+  text-align: center;
+}
+
+.delete-btn {
+  background: #fdecea;
+  color: #c62828;
+  font-size: 28rpx;
+  border: none;
+  border-radius: 12rpx;
+  padding: 20rpx 60rpx;
+  display: inline-block;
+}

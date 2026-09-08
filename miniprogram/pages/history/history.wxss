@@ -1,0 +1,166 @@
+/* pages/history/history.wxss */
+.history-container {
+  padding: 20rpx;
+  min-height: 100vh;
+}
+
+.loading {
+  text-align: center;
+  padding: 100rpx 0;
+  color: #999;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 120rpx 40rpx;
+  color: #999;
+}
+
+.empty-state .icon {
+  display: block;
+  font-size: 80rpx;
+  margin-bottom: 20rpx;
+}
+
+.empty-state text {
+  display: block;
+  font-size: 28rpx;
+  margin-bottom: 12rpx;
+}
+
+.empty-state .hint {
+  font-size: 24rpx;
+  color: #bbb;
+}
+
+/* 结算卡片 */
+.settlement-card {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  color: #fff;
+  box-shadow: 0 4rpx 15rpx rgba(102,126,234,0.3);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.card-time {
+  font-size: 24rpx;
+  opacity: 0.9;
+}
+
+.card-round {
+  font-size: 22rpx;
+  background: rgba(255,255,255,0.2);
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+}
+
+.card-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.player-score-item {
+  flex: 1;
+  min-width: 45%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255,255,255,0.1);
+  padding: 12rpx 16rpx;
+  border-radius: 10rpx;
+}
+
+.p-name {
+  font-size: 26rpx;
+}
+
+.p-score {
+  font-size: 30rpx;
+  font-weight: bold;
+}
+
+.p-score.positive {
+  color: #ffcccc;
+}
+
+.p-score.negative {
+  color: #ccffcc;
+}
+
+.card-remark {
+  margin-top: 16rpx;
+  padding: 12rpx 16rpx;
+  background: rgba(255,255,255,0.15);
+  border-radius: 10rpx;
+  font-size: 24rpx;
+  display: flex;
+  align-items: center;
+}
+
+.remark-icon {
+  margin-right: 8rpx;
+}
+
+.remark-text {
+  flex: 1;
+}
+
+/* 弹窗 */
+.modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.6);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  width: 80%;
+  max-width: 600rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 32rpx;
+  text-align: center;
+  border-bottom: 1rpx solid #eee;
+}
+
+.modal-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.modal-body {
+  padding: 32rpx;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 20rpx;
+  padding: 0 32rpx 32rpx;
+}
+
+.modal-btn {
+  flex: 1;
+  margin-top: 0;
+  font-size: 28rpx;
+  padding: 20rpx;
+}

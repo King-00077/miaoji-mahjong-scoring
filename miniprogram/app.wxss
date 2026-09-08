@@ -1,0 +1,103 @@
+/**app.wxss**/
+page {
+  background-color: #f5f6fa;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-size: 28rpx;
+  color: #333;
+  line-height: 1.5;
+}
+
+.container {
+  padding: 20rpx;
+  box-sizing: border-box;
+}
+
+/* 通用按钮 */
+.btn-primary {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  border: none;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  font-weight: bold;
+  padding: 24rpx;
+  text-align: center;
+}
+
+.btn-secondary {
+  background: #f0f2f5;
+  color: #444;
+  border: none;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  font-weight: bold;
+  padding: 24rpx;
+  text-align: center;
+}
+
+/* 通用卡片 */
+.card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.05);
+}
+
+/* 通用输入框 */
+.input-field {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20rpx 24rpx;
+  border: 2rpx solid #e0e0e0;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  background: #fff;
+}
+
+.input-field:focus {
+  border-color: #667eea;
+}
+
+/* 状态提示 */
+.status-msg {
+  margin-top: 20rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+}
+
+.status-success {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-error {
+  background: #fdecea;
+  color: #c62828;
+}
+
+.status-info {
+  background: #e8eaf6;
+  color: #3f51b5;
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 80rpx 40rpx;
+  color: #999;
+}
+
+.empty-state .icon {
+  font-size: 80rpx;
+  margin-bottom: 20rpx;
+}
+
+/* 渐变文字 */
+.gradient-text {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}

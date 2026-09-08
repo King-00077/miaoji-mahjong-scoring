@@ -1,0 +1,69 @@
+<!--pages/detail/detail.wxml-->
+<view class="detail-container" wx:if="{{settlement}}">
+  <!-- 概览区 -->
+  <view class="overview card">
+    <view class="overview-header">
+      <text class="overview-time">{{settlement.timestamp || settlement.time || ''}}</text>
+      <text class="overview-round">第{{settlement.round || 0}}局</text>
+    </view>
+    <view class="remark-area">
+      <input class="remark-input" type="text" placeholder="输入结算备注（可选）" maxlength="200" value="{{remark}}" bindinput="onRemarkInput" />
+      <button class="remark-btn" size="mini" bindtap="onSaveRemark" loading="{{remarkLoading}}">保存</button>
+    </view>
+  </view>
+
+  <!-- 玩家统计 -->
+  <view class="stats-section">
+    <view class="section-title">玩家统计</view>
+    <view class="player-stat-card card" wx:for="{{settlement.players}}" wx:key="id">
+      <view class="stat-head">
+        <text class="stat-name">{{item.nickname || item.name}}</text>
+        <text class="stat-score {{item.score > 0 ? 'positive' : item.score < 0 ? 'negative' : ''}}">
+          {{item.score > 0 ? '+' : ''}}{{item.score || 0}}
+        </text>
+      </view>
+      <view class="stat-grid">
+        <view class="stat-cell">
+          <text class="stat-val">{{item.winRate || '0%'}}</text>
+          <text class="stat-label">胜率</text>
+        </view>
+        <view class="stat-cell">
+          <text class="stat-val">{{item.winCount || 0}}</text>
+          <text class="stat-label">获胜</text>
+        </view>
+        <view class="stat-cell">
+          <text class="stat-val">{{item.selfDrawCount || 0}}</text>
+          <text class="stat-label">自摸</text>
+        </view>
+        <view class="stat-cell">
+          <text class="stat-val">{{item.bankerCount || 0}}</text>
+          <text class="stat-label">庄家</text>
+        </view>
+        <view class="stat-cell">
+          <text class="stat-val">{{item.maxWinStreak || 0}}</text>
+          <text class="stat-label">连胜</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 对局历史 -->
+  <view class="history-section" wx:if="{{settlement.history && settlement.history.length > 0}}">
+    <view class="section-title">对局明细</view>
+    <view class="history-item card" wx:for="{{settlement.history}}" wx:key="index">
+      <view class="history-row">
+        <text class="history-label">第{{index + 1}}局</text>
+        <text class="history-desc">{{item.desc || ''}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 删除按钮 -->
+  <view class="delete-area">
+    <button class="delete-btn" bindtap="onDelete">删除此条结算记录</button>
+  </view>
+</view>
+
+<view wx:else class="loading">
+  <text>加载中...</text>
+</view>

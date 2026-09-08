@@ -1,0 +1,56 @@
+<!--pages/login/login.wxml-->
+<view class="login-container">
+  <view class="login-header">
+    <view class="login-icon">🀄</view>
+    <text class="login-title">嘴子麻将计分器</text>
+    <text class="login-subtitle">注册后自动生成用户ID\n统计历史总分与胜率</text>
+  </view>
+
+  <view class="login-form">
+    <view class="form-item">
+      <text class="form-label">昵称 <text class="required">*</text></text>
+      <text class="form-hint">即账号，1-20字，不可重复</text>
+      <input class="input-field" type="text" placeholder="例如 马驰、老王、阿飞" maxlength="20" value="{{nickname}}" bindinput="onNicknameInput" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">密码 <text class="required">*</text></text>
+      <input class="input-field" password placeholder="设置/输入密码" value="{{password}}" bindinput="onPasswordInput" />
+    </view>
+
+    <view wx:if="{{statusMsg}}" class="status-msg {{statusType}}">{{statusMsg}}</view>
+
+    <button class="btn-primary" bindtap="onRegister" loading="{{loading}}">
+      注册并进入
+    </button>
+    <button class="btn-secondary" bindtap="onLogin" loading="{{loading}}">
+      已有账号，登录
+    </button>
+
+    <view class="forgot-link" bindtap="showResetModal">
+      忘记账号？通过ID重置
+    </view>
+
+    <view wx:if="{{currentUser}}" class="current-user">
+      当前账号：<text class="user-name">{{currentUser.nickname}}</text>（{{currentUser.userId}}）
+    </view>
+  </view>
+
+  <!-- 重置账号弹窗 -->
+  <view wx:if="{{showReset}}" class="modal-mask" bindtap="hideResetModal">
+    <view class="modal-content" catchtap="">
+      <view class="modal-header">
+        <text class="modal-title">通过ID重置账号</text>
+      </view>
+      <view class="modal-body">
+        <text class="modal-desc">输入您的用户ID，重置后\n昵称为ID，登录密码为 123456</text>
+        <input class="input-field" type="text" placeholder="例如 u0001" value="{{resetUid}}" bindinput="onResetUidInput" />
+        <view wx:if="{{resetStatusMsg}}" class="status-msg {{resetStatusType}}">{{resetStatusMsg}}</view>
+      </view>
+      <view class="modal-footer">
+        <button class="btn-secondary modal-btn" bindtap="hideResetModal">取消</button>
+        <button class="btn-primary modal-btn" bindtap="onConfirmReset" loading="{{resetLoading}}">确认重置</button>
+      </view>
+    </view>
+  </view>
+</view>

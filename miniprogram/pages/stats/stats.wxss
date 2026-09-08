@@ -1,0 +1,221 @@
+/* pages/stats/stats.wxss */
+.stats-container {
+  padding: 20rpx;
+  padding-bottom: 60rpx;
+  min-height: 100vh;
+}
+
+/* 用户卡片 */
+.user-card {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 20rpx;
+  padding: 32rpx;
+  margin-bottom: 24rpx;
+  color: #fff;
+}
+
+.user-avatar {
+  font-size: 64rpx;
+  margin-right: 20rpx;
+}
+
+.user-detail {
+  flex: 1;
+}
+
+.user-nickname {
+  display: block;
+  font-size: 34rpx;
+  font-weight: bold;
+}
+
+.user-id {
+  display: block;
+  font-size: 24rpx;
+  opacity: 0.8;
+  margin-top: 6rpx;
+}
+
+.logout-btn {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  font-size: 24rpx;
+  border: none;
+}
+
+/* 查询区 */
+.query-row {
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.query-input {
+  flex: 1;
+  padding: 16rpx 20rpx;
+  border: 2rpx solid #e0e0e0;
+  border-radius: 10rpx;
+  font-size: 26rpx;
+}
+
+.query-btn {
+  background: #667eea;
+  color: #fff;
+  font-size: 26rpx;
+  padding: 0 28rpx;
+}
+
+/* 战绩汇总 */
+.summary-card {
+  background: linear-gradient(135deg, #eef2ff, #f5f0ff);
+  border: 2rpx solid #667eea44;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+}
+
+.summary-name {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 16rpx;
+}
+
+.summary-id {
+  font-size: 24rpx;
+  color: #999;
+  font-weight: normal;
+}
+
+.summary-grid {
+  display: flex;
+  justify-content: space-around;
+  text-align: center;
+  margin: 16rpx 0;
+}
+
+.summary-cell {
+  flex: 1;
+}
+
+.summary-val {
+  display: block;
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.summary-val.gold { color: #f5a623; }
+.summary-val.green { color: #27ae60; }
+.summary-val.red { color: #e74c3c; }
+
+.summary-label {
+  display: block;
+  font-size: 22rpx;
+  color: #888;
+  margin-top: 6rpx;
+}
+
+.summary-extra {
+  text-align: center;
+  font-size: 24rpx;
+  color: #888;
+  margin-top: 12rpx;
+}
+
+/* 对局明细 */
+.section-title {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #333;
+  margin: 24rpx 0 16rpx;
+  padding-left: 8rpx;
+}
+
+.detail-item {
+  padding: 20rpx;
+  margin-bottom: 12rpx;
+}
+
+.detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.detail-time {
+  font-size: 26rpx;
+  color: #333;
+  font-weight: bold;
+}
+
+.detail-score {
+  font-size: 32rpx;
+  font-weight: bold;
+}
+
+.detail-score.red { color: #e74c3c; }
+.detail-score.green { color: #27ae60; }
+
+.detail-meta {
+  font-size: 22rpx;
+  color: #999;
+  margin-top: 8rpx;
+}
+
+.detail-remark {
+  display: block;
+  color: #667eea;
+  margin-top: 4rpx;
+}
+
+.loading {
+  text-align: center;
+  padding: 60rpx 0;
+  color: #999;
+}
+
+/* 收款码 */
+.qrcode-section {
+  margin-top: 30rpx;
+}
+
+.qrcode-area {
+  text-align: center;
+  padding: 20rpx 0;
+}
+
+.qrcode-preview {
+  width: 300rpx;
+  height: 300rpx;
+  border: 2rpx solid #eee;
+  border-radius: 12rpx;
+}
+
+.no-qrcode {
+  padding: 40rpx 0;
+  color: #999;
+  font-size: 26rpx;
+}
+
+.qrcode-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
+.action-btn {
+  flex: 1;
+  margin-top: 0;
+  font-size: 28rpx;
+  padding: 20rpx;
+}
+
+.qrcode-tip {
+  text-align: center;
+  font-size: 22rpx;
+  color: #bbb;
+  margin-top: 12rpx;
+}

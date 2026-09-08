@@ -1,0 +1,88 @@
+<!--pages/stats/stats.wxml-->
+<view class="stats-container">
+  <!-- 用户信息卡片 -->
+  <view class="user-card">
+    <view class="user-avatar">🀄</view>
+    <view class="user-detail">
+      <text class="user-nickname">{{userInfo.nickname || '未登录'}}</text>
+      <text class="user-id" wx:if="{{userInfo.userId}}">ID: {{userInfo.userId}}</text>
+    </view>
+    <button class="logout-btn" size="mini" bindtap="onLogout" wx:if="{{userInfo.userId}}">退出</button>
+  </view>
+
+  <!-- 查询区 -->
+  <view class="query-section card">
+    <view class="query-row">
+      <input class="query-input" type="text" placeholder="输入用户ID查询战绩" value="{{queryUserId}}" bindinput="onQueryInput" />
+      <button class="query-btn" size="mini" bindtap="onQuery">查询</button>
+    </view>
+  </view>
+
+  <!-- 战绩汇总 -->
+  <view wx:if="{{stats}}" class="summary-card">
+    <view class="summary-name">
+      <text>{{stats.nickname || queryUserId || userInfo.nickname}}</text>
+      <text class="summary-id">({{stats.userId || ''}})</text>
+    </view>
+    <view class="summary-grid">
+      <view class="summary-cell">
+        <text class="summary-val gold">{{stats.winRate || '0%'}}</text>
+        <text class="summary-label">总胜率</text>
+      </view>
+      <view class="summary-cell">
+        <text class="summary-val">{{stats.totalRounds || 0}}</text>
+        <text class="summary-label">总局数</text>
+      </view>
+      <view class="summary-cell">
+        <text class="summary-val green">{{stats.winRounds || 0}}</text>
+        <text class="summary-label">胜局</text>
+      </view>
+      <view class="summary-cell">
+        <text class="summary-val {{stats.totalScore > 0 ? 'red' : stats.totalScore < 0 ? 'green' : ''}}">
+          {{stats.totalScore > 0 ? '+' : ''}}{{stats.totalScore || 0}}
+        </text>
+        <text class="summary-label">累计得分</text>
+      </view>
+    </view>
+    <view class="summary-extra">
+      <text>参与 {{stats.sessions || 0}} 场对局 · 赢 {{stats.winSessions || 0}} 场（场次胜率 {{stats.sessionWinRate || '0%'}}）</text>
+    </view>
+  </view>
+
+  <view wx:elif="{{loading}}" class="loading">
+    <text>加载中...</text>
+  </view>
+
+  <!-- 对局明细 -->
+  <view wx:if="{{stats && stats.details && stats.details.length > 0}}" class="details-section">
+    <view class="section-title">对局明细</view>
+    <view class="detail-item card" wx:for="{{stats.details}}" wx:key="index">
+      <view class="detail-head">
+        <text class="detail-time">{{item.timestamp || ''}}</text>
+        <text class="detail-score {{item.score > 0 ? 'red' : item.score < 0 ? 'green' : ''}}">
+          {{item.score > 0 ? '+' : ''}}{{item.score || 0}}
+        </text>
+      </view>
+      <view class="detail-meta">
+        <text>{{item.duration || ''}} · {{item.totalRounds || 0}}局 胜{{item.winRounds || 0}}</text>
+        <text wx:if="{{item.remark}}" class="detail-remark">{{item.remark}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 收款码设置 -->
+  <view class="qrcode-section card">
+    <view class="section-title">收款码设置</view>
+    <view class="qrcode-area">
+      <image wx:if="{{payQrcode}}" class="qrcode-preview" src="{{payQrcode}}" mode="aspectFit" show-menu-by-longpress />
+      <view wx:else class="no-qrcode">
+        <text>未设置收款码</text>
+      </view>
+    </view>
+    <view class="qrcode-actions">
+      <button class="btn-primary action-btn" bindtap="onChooseQrcode">上传收款码</button>
+      <button class="btn-secondary action-btn" bindtap="onClearQrcode" wx:if="{{payQrcode}}">清除</button>
+    </view>
+    <view class="qrcode-tip">结算后自动弹出收款码，收款码保存在本地不上传服务器</view>
+  </view>
+</view>

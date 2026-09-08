@@ -1,0 +1,49 @@
+<!--pages/history/history.wxml-->
+<view class="history-container">
+  <view wx:if="{{loading}}" class="loading">
+    <text>加载中...</text>
+  </view>
+
+  <view wx:elif="{{settlements.length === 0}}" class="empty-state">
+    <text class="icon">📦</text>
+    <text>暂无历史结算记录</text>
+    <text class="hint">结算后的对局数据将保存在这里</text>
+  </view>
+
+  <view wx:else class="history-list">
+    <view class="settlement-card" wx:for="{{settlements}}" wx:key="id" bindtap="goDetail" data-id="{{item.id}}">
+      <view class="card-header">
+        <text class="card-time">{{item.timestamp || item.time || ''}}</text>
+        <text class="card-round">第{{item.round || 0}}局</text>
+      </view>
+      <view class="card-players">
+        <view class="player-score-item" wx:for="{{item.players}}" wx:for-item="p" wx:key="id">
+          <text class="p-name">{{p.nickname || p.name}}</text>
+          <text class="p-score {{p.score > 0 ? 'positive' : p.score < 0 ? 'negative' : ''}}">
+            {{p.score > 0 ? '+' : ''}}{{p.score || 0}}
+          </text>
+        </view>
+      </view>
+      <view wx:if="{{item.remark}}" class="card-remark" catchtap="onEditRemark" data-id="{{item.id}}" data-remark="{{item.remark}}">
+        <text class="remark-icon">📝</text>
+        <text class="remark-text">{{item.remark}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 编辑备注弹窗 -->
+  <view wx:if="{{showRemarkModal}}" class="modal-mask" bindtap="hideRemarkModal">
+    <view class="modal-content" catchtap="">
+      <view class="modal-header">
+        <text class="modal-title">编辑结算备注</text>
+      </view>
+      <view class="modal-body">
+        <input class="input-field" type="text" placeholder="输入备注（可选）" maxlength="200" value="{{editRemark}}" bindinput="onEditRemarkInput" />
+      </view>
+      <view class="modal-footer">
+        <button class="btn-secondary modal-btn" bindtap="hideRemarkModal">取消</button>
+        <button class="btn-primary modal-btn" bindtap="onSaveRemark" loading="{{remarkLoading}}">保存</button>
+      </view>
+    </view>
+  </view>
+</view>
