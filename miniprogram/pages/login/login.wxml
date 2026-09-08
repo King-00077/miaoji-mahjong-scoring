@@ -7,6 +7,21 @@
   </view>
 
   <view class="login-form">
+    <!-- 微信一键登录 -->
+    <view class="wx-login-area">
+      <button class="wx-login-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+        <text class="wx-icon">💬</text>
+        <text>微信一键登录</text>
+      </button>
+      <view class="wx-login-hint">使用微信头像和昵称快速登录</view>
+    </view>
+
+    <view class="divider">
+      <text class="divider-line"></text>
+      <text class="divider-text">或使用账号登录</text>
+      <text class="divider-line"></text>
+    </view>
+
     <view class="form-item">
       <text class="form-label">昵称 <text class="required">*</text></text>
       <text class="form-hint">即账号，1-20字，不可重复</text>
@@ -33,6 +48,30 @@
 
     <view wx:if="{{currentUser}}" class="current-user">
       当前账号：<text class="user-name">{{currentUser.nickname}}</text>（{{currentUser.userId}}）
+    </view>
+  </view>
+
+  <!-- 微信头像昵称确认弹窗 -->
+  <view wx:if="{{showWxConfirm}}" class="modal-mask" bindtap="hideWxConfirm">
+    <view class="modal-content" catchtap="">
+      <view class="modal-header">
+        <text class="modal-title">完善微信信息</text>
+      </view>
+      <view class="modal-body">
+        <view class="wx-avatar-area">
+          <image class="wx-avatar" src="{{wxAvatar || '/images/default_avatar.png'}}" mode="aspectFill" />
+          <button class="wx-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">更换头像</button>
+        </view>
+        <view class="form-item">
+          <text class="form-label">微信昵称</text>
+          <input class="input-field" type="nickname" placeholder="请输入昵称" value="{{wxNickname}}" bindinput="onWxNicknameInput" />
+        </view>
+        <view wx:if="{{wxStatusMsg}}" class="status-msg {{wxStatusType}}">{{wxStatusMsg}}</view>
+      </view>
+      <view class="modal-footer">
+        <button class="btn-secondary modal-btn" bindtap="hideWxConfirm">取消</button>
+        <button class="btn-primary modal-btn" bindtap="onWxLoginConfirm" loading="{{wxLoading}}">确认登录</button>
+      </view>
     </view>
   </view>
 

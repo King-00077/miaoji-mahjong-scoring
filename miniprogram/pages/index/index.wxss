@@ -45,6 +45,19 @@
 }
 
 .user-info {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.user-avatar-mini {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  border: 2rpx solid #667eea;
+}
+
+.user-text {
   text-align: right;
 }
 

@@ -49,6 +49,11 @@ const request = {
     return this.post('/api/user/resetNickById', { uid });
   },
 
+  // 微信一键登录
+  async wxLogin(code, nickname, avatar) {
+    return this.post('/api/user/wx-login', { code, nickname, avatar });
+  },
+
   async updateNickname(userId, nickname, password) {
     return this.post('/api/user/update-nickname', { userId, nickname, password });
   },

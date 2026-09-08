@@ -21,6 +21,24 @@
   margin-right: 20rpx;
 }
 
+.user-avatar-img {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  margin-right: 20rpx;
+  border: 4rpx solid rgba(255,255,255,0.3);
+}
+
+.user-wx-tag {
+  display: inline-block;
+  font-size: 20rpx;
+  background: rgba(7,193,96,0.3);
+  color: #fff;
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+  margin-top: 6rpx;
+}
+
 .user-detail {
   flex: 1;
 }

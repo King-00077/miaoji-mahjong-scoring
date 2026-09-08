@@ -2,10 +2,12 @@
 <view class="stats-container">
   <!-- 用户信息卡片 -->
   <view class="user-card">
-    <view class="user-avatar">🀄</view>
+    <image wx:if="{{userInfo.avatar}}" class="user-avatar-img" src="{{userInfo.avatar}}" mode="aspectFill" />
+    <view wx:else class="user-avatar">🀄</view>
     <view class="user-detail">
       <text class="user-nickname">{{userInfo.nickname || '未登录'}}</text>
       <text class="user-id" wx:if="{{userInfo.userId}}">ID: {{userInfo.userId}}</text>
+      <text class="user-wx-tag" wx:if="{{userInfo.isWxLogin}}">微信登录</text>
     </view>
     <button class="logout-btn" size="mini" bindtap="onLogout" wx:if="{{userInfo.userId}}">退出</button>
   </view>

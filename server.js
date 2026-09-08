@@ -250,6 +250,10 @@ const usersDb = new Low(
     }
 );
 
+// ===== 微信小程序配置（填入你的小程序 AppID 和 AppSecret）=====
+const WX_APPID = '';       // 小程序 AppID
+const WX_SECRET = '';      // 小程序 AppSecret
+
 // 密码哈希（不设密码策略，但避免明文存储）
 function hashPassword(pwd) {
     return crypto.createHash('sha256').update(String(pwd)).digest('hex');
@@ -632,6 +636,103 @@ const scoreServer = http.createServer((req, res) => {
                 console.log(`用户重置: ${userId} 昵称已重置为ID，密码重置为123456`);
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({ success: true, msg: '重置成功！昵称已改为' + userId + '，登录密码重置为123456' }));
+            } catch (e) {
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, msg: e.message }));
+            }
+        })();
+        return;
+    }
+
+    // 微信小程序一键登录
+    if (req.url === '/api/user/wx-login' && req.method === 'POST') {
+        (async () => {
+            try {
+                const body = await readBody(req);
+                const data = JSON.parse(body || '{}');
+                const code = String(data.code || '').trim();
+                const nickname = String(data.nickname || '').trim();
+                const avatar = String(data.avatar || '').trim();
+
+                if (!code) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '缺少微信登录凭证' }));
+                    return;
+                }
+                if (!WX_APPID || !WX_SECRET) {
+                    res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '服务器未配置微信小程序 AppID/AppSecret' }));
+                    return;
+                }
+
+                // 用 code 换取 openid
+                const wxUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${WX_APPID}&secret=${WX_SECRET}&js_code=${code}&grant_type=authorization_code`;
+                let wxData;
+                try {
+                    const wxRes = await fetch(wxUrl);
+                    wxData = await wxRes.json();
+                } catch (e) {
+                    res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '微信接口调用失败: ' + e.message }));
+                    return;
+                }
+
+                if (wxData.errcode) {
+                    res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '微信登录失败: ' + (wxData.errmsg || '未知错误') }));
+                    return;
+                }
+
+                const openid = wxData.openid;
+                if (!openid) {
+                    res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '获取微信openid失败' }));
+                    return;
+                }
+
+                await usersDb.read();
+                const users = usersDb.data.users || [];
+                let user = users.find(u => u.wxOpenid === openid);
+
+                if (user) {
+                    // 已存在用户，更新昵称和头像（如果有传入）
+                    if (nickname) user.nickname = nickname;
+                    if (avatar) user.avatar = avatar;
+                    user.lastLoginAt = new Date().toLocaleString('zh-CN', { hour12: false });
+                } else {
+                    // 新用户，自动创建
+                    const userId = generateUserId(users);
+                    user = {
+                        userId,
+                        nickname: nickname || '微信用户',
+                        password: hashPassword(crypto.randomBytes(16).toString('hex')), // 随机密码，微信登录无需密码
+                        wxOpenid: openid,
+                        avatar: avatar || '',
+                        createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+                        lastLoginAt: new Date().toLocaleString('zh-CN', { hour12: false })
+                    };
+                    users.push(user);
+                    console.log(`微信用户注册: ${userId} (${user.nickname}) openid: ${openid}`);
+                }
+
+                usersDb.data.users = users;
+                await usersDb.write();
+
+                const stats = await computeUserStats(user.userId);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: true,
+                    user: {
+                        userId: user.userId,
+                        nickname: user.nickname,
+                        avatar: user.avatar || '',
+                        wxOpenid: user.wxOpenid,
+                        createdAt: user.createdAt,
+                        lastLoginAt: user.lastLoginAt
+                    },
+                    stats,
+                    isNew: !users.find(u => u.userId === user.userId && u.createdAt === user.lastLoginAt)
+                }));
             } catch (e) {
                 res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({ success: false, msg: e.message }));

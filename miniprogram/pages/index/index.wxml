@@ -7,8 +7,11 @@
       <text>{{socketConnected ? '已连接' : '连接中...'}}</text>
     </view>
     <view class="user-info" bindtap="goStats">
-      <text class="user-nickname">{{userInfo.nickname || '未登录'}}</text>
-      <text class="user-id" wx:if="{{userInfo.userId}}">{{userInfo.userId}}</text>
+      <image wx:if="{{userInfo.avatar}}" class="user-avatar-mini" src="{{userInfo.avatar}}" mode="aspectFill" />
+      <view class="user-text">
+        <text class="user-nickname">{{userInfo.nickname || '未登录'}}</text>
+        <text class="user-id" wx:if="{{userInfo.userId}}">{{userInfo.userId}}</text>
+      </view>
     </view>
   </view>
 
