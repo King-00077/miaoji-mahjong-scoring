@@ -3678,6 +3678,9 @@ body.guest-mode .manual-score-btn {
         // 服务器连接面板是否已显示（避免重复弹出）
         let serverConnectPanelShown = false;
 
+        // 内置默认服务器地址：前端直开（file://）或无法自动检测服务器时使用
+        const BUILTIN_SERVER_ADDR = '47.109.52.139:2525';
+
         // 解析监控端主机地址（用于跳转 http://host:5252）
         // 优先级：SERVER_IP_ADDRESS > OVERRIDE_SERVER_WS_URL > localStorage 保存地址 > window.location.hostname
         function resolveMonitorHost() {
@@ -3831,6 +3834,11 @@ body.guest-mode .manual-score-btn {
                     } catch (e) {
                         console.log('无法获取服务器IP列表，使用当前主机');
                     }
+                }
+
+                // file:// 直开时主机名为空：使用内置默认服务器地址
+                if (!host) {
+                    return `${protocol}//${BUILTIN_SERVER_ADDR}`;
                 }
 
                 return `${protocol}//${SERVER_IP_ADDRESS}:${SERVER_PORT}`;
@@ -4112,6 +4120,12 @@ body.guest-mode .manual-score-btn {
             const hintEl = document.getElementById('scSavedHint');
             if (hintEl) {
                 hintEl.textContent = saved ? `上次地址: ${saved}` : '';
+            }
+            // 预填服务器地址（优先上次保存的，其次内置默认）
+            const inputEl = document.getElementById('scServerInput');
+            if (inputEl && !inputEl.value.trim()) {
+                const prefill = saved ? saved.replace(/^wss?:\/\//i, '').split('/')[0] : BUILTIN_SERVER_ADDR;
+                inputEl.value = prefill;
             }
             // 隐藏身份选择面板和主应用，避免遮挡
             const idPanel = document.getElementById('identitySelectionPanel');
@@ -5489,8 +5503,8 @@ body.guest-mode .manual-score-btn {
             if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
                 return `${window.location.protocol}//${window.location.hostname}:${SERVER_PORT}`;
             }
-            // 5. 无法确定服务器地址（file:// 且无保存地址）
-            return null;
+            // 5. 无法确定服务器地址（file:// 且无保存地址）：使用内置默认服务器
+            return `http://${BUILTIN_SERVER_ADDR}`;
         }
 
         // 服务端 TTS 播放
@@ -5863,12 +5877,24 @@ body.guest-mode .manual-score-btn {
             // 无候选地址：探测当前页面主机（页面由服务器提供的情况）
             const host = window.location.hostname;
             const port = SERVER_PORT;
-            const probeUrl = `ws://${host}:${port}`;
-            const ok = await testServerReachable(probeUrl, 3500);
+            let ok = false;
+            if (host) {
+                const probeUrl = `ws://${host}:${port}`;
+                ok = await testServerReachable(probeUrl, 3500);
+            }
             if (ok) {
                 initWebSocket();
+                return;
+            }
+
+            // 当前主机不可达：再探测内置默认服务器地址
+            const builtinUrl = `ws://${BUILTIN_SERVER_ADDR}`;
+            const builtinOk = await testServerReachable(builtinUrl, 3500);
+            if (builtinOk) {
+                try { localStorage.setItem('sc_server_addr', builtinUrl); } catch(e) {}
+                initWebSocket();
             } else {
-                // 当前主机也不可达，显示连接面板
+                // 内置地址也不可达，显示连接面板
                 showServerConnectPanel('无法检测到计分服务器，请手动输入或扫码接入');
             }
         }
@@ -12342,6 +12368,19 @@ body.guest-mode .manual-score-btn {
             document.getElementById('uaStatus').style.display = 'none';
         }
 
+        // 带超时的 fetch：避免服务器不可达时请求无限挂起导致界面卡死
+        function fetchWithTimeout(url, options, timeoutMs) {
+            const controller = new AbortController();
+            const timer = setTimeout(function() { controller.abort(); }, timeoutMs || 8000);
+            return fetch(url, Object.assign({}, options || {}, { signal: controller.signal }))
+                .finally(function() { clearTimeout(timer); });
+        }
+        // 格式化网络错误提示（区分超时与普通失败）
+        function networkErrMsg(e) {
+            if (e && e.name === 'AbortError') return '连接服务器超时，请检查网络或服务器地址';
+            return '网络错误，请检查服务器连接: ' + (e && e.message ? e.message : e);
+        }
+
         // 注册：昵称 + 密码，服务端自动生成 userId，注册成功即自动登录
         async function doRegister() {
             const nickname = document.getElementById('uaNicknameInput').value.trim();
@@ -12350,11 +12389,11 @@ body.guest-mode .manual-score-btn {
             if (!password) { showUaStatus('请设置密码', 'error'); return; }
             try {
                 showUaStatus('注册中...', 'info');
-                const resp = await fetch(userApiUrl('/api/user/register'), {
+                const resp = await fetchWithTimeout(userApiUrl('/api/user/register'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ nickname, password })
-                });
+                }, 8000);
                 const data = await resp.json();
                 if (data.success) {
                     // 注册完自动登录：保存含密码的登录态（后续 join 需校验）
@@ -12366,7 +12405,7 @@ body.guest-mode .manual-score-btn {
                     showUaStatus(data.msg || '注册失败', 'error');
                 }
             } catch (e) {
-                showUaStatus('网络错误，请检查服务器连接: ' + e.message, 'error');
+                showUaStatus(networkErrMsg(e), 'error');
             }
         }
 
@@ -12378,11 +12417,11 @@ body.guest-mode .manual-score-btn {
             if (!password) { showUaStatus('请输入密码', 'error'); return; }
             try {
                 showUaStatus('登录中...', 'info');
-                const resp = await fetch(userApiUrl('/api/user/login'), {
+                const resp = await fetchWithTimeout(userApiUrl('/api/user/login'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ nickname, password })
-                });
+                }, 8000);
                 const data = await resp.json();
                 if (data.success) {
                     setCurrentUser({ userId: data.user.userId, nickname: data.user.nickname, password });
@@ -12393,7 +12432,7 @@ body.guest-mode .manual-score-btn {
                     showUaStatus(data.msg || '登录失败', 'error');
                 }
             } catch (e) {
-                showUaStatus('网络错误，请检查服务器连接: ' + e.message, 'error');
+                showUaStatus(networkErrMsg(e), 'error');
             }
         }
 
@@ -12520,7 +12559,7 @@ body.guest-mode .manual-score-btn {
             summaryEl.innerHTML = '<div style="text-align:center;color:#999;padding:24px 0;"><i class="fas fa-spinner fa-spin"></i> 查询中...</div>';
             detailsEl.innerHTML = '';
             try {
-                const resp = await fetch(userApiUrl('/api/user/stats?userId=' + encodeURIComponent(userId)));
+                const resp = await fetchWithTimeout(userApiUrl('/api/user/stats?userId=' + encodeURIComponent(userId)), null, 8000);
                 const data = await resp.json();
                 if (!data.success) {
                     summaryEl.innerHTML = '<div style="text-align:center;color:#c62828;padding:20px 0;">' + (data.msg || '查询失败') + '</div>';
@@ -12718,7 +12757,7 @@ body.guest-mode .manual-score-btn {
             panel.style.display = 'flex';
             content.innerHTML = '<div style="text-align:center;padding:24px 0;color:#999;"><i class="fas fa-spinner fa-spin"></i> 加载中...</div>';
             try {
-                const resp = await fetch(userApiUrl('/api/user/stats?userId=' + encodeURIComponent(userId)));
+                const resp = await fetchWithTimeout(userApiUrl('/api/user/stats?userId=' + encodeURIComponent(userId)), null, 8000);
                 const data = await resp.json();
                 if (!data.success) { content.innerHTML = '<div style="text-align:center;padding:20px;color:#c62828;">加载失败</div>'; return; }
                 const details = (data.stats && data.stats.details) || [];
@@ -12792,11 +12831,11 @@ body.guest-mode .manual-score-btn {
             if (newPwd !== confirmPwd) { setStatus('两次输入的新密码不一致', false); return; }
             try {
                 setStatus('保存中...', true);
-                const resp = await fetch(userApiUrl('/api/user/change-password'), {
+                const resp = await fetchWithTimeout(userApiUrl('/api/user/change-password'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId: me.userId, oldPassword: oldPwd, newPassword: newPwd })
-                });
+                }, 8000);
                 const data = await resp.json();
                 if (data.success) {
                     // 同步更新本地登录态中的密码（后续 WS join 校验需要）
@@ -12807,7 +12846,7 @@ body.guest-mode .manual-score-btn {
                     setStatus(data.msg || '修改失败', false);
                 }
             } catch (e) {
-                setStatus('网络错误: ' + e.message, false);
+                setStatus(networkErrMsg(e), false);
             }
         }
 
@@ -12839,11 +12878,11 @@ body.guest-mode .manual-score-btn {
             if (newNick === me.nickname) { setStatus('用户名未变更', false); return; }
             try {
                 setStatus('保存中...', true);
-                const resp = await fetch(userApiUrl('/api/user/update-nickname'), {
+                const resp = await fetchWithTimeout(userApiUrl('/api/user/update-nickname'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId: me.userId, nickname: newNick, password: pwd })
-                });
+                }, 8000);
                 const data = await resp.json();
                 if (data.success) {
                     setCurrentUser({ userId: me.userId, nickname: data.user.nickname, password: pwd });
@@ -12912,14 +12951,14 @@ body.guest-mode .manual-score-btn {
             const statsEl = document.getElementById('uiStats');
             if (!statsEl) return;
             try {
-                const resp = await fetch(userApiUrl('/api/user/stats?userId=' + encodeURIComponent(me.userId)));
+                const resp = await fetchWithTimeout(userApiUrl('/api/user/stats?userId=' + encodeURIComponent(me.userId)), null, 8000);
                 const data = await resp.json();
                 if (!data.success) { statsEl.innerHTML = '<div style="text-align:center;color:#c62828;padding:16px 0;">' + (data.msg || '加载失败') + '</div>'; return; }
                 const s = data.stats;
                 const scoreColor = s.totalScore > 0 ? '#2e7d32' : (s.totalScore < 0 ? '#c62828' : '#666');
                 let rankText = '暂无排名';
                 try {
-                    const lbResp = await fetch(userApiUrl('/api/user/leaderboard?sortBy=totalScore'));
+                    const lbResp = await fetchWithTimeout(userApiUrl('/api/user/leaderboard?sortBy=totalScore'), null, 8000);
                     const lbData = await lbResp.json();
                     if (lbData.success) {
                         const mine = (lbData.list || []).find(x => x.userId === me.userId);
