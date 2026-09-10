@@ -609,6 +609,55 @@ const scoreServer = http.createServer((req, res) => {
         return;
     }
 
+    // 修改密码：需校验当前密码
+    if (req.url === '/api/user/change-password' && req.method === 'POST') {
+        (async () => {
+            try {
+                const body = await readBody(req);
+                const data = JSON.parse(body || '{}');
+                const userId = String(data.userId || '').trim();
+                const oldPassword = String(data.oldPassword || '');
+                const newPassword = String(data.newPassword || '');
+                if (!userId || !oldPassword || !newPassword) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '参数不完整' }));
+                    return;
+                }
+                if (newPassword.length > 100) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '新密码过长' }));
+                    return;
+                }
+                await usersDb.read();
+                const user = (usersDb.data.users || []).find(u => u.userId === userId);
+                if (!user) {
+                    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '用户不存在' }));
+                    return;
+                }
+                if (user.password !== hashPassword(oldPassword)) {
+                    res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '当前密码错误' }));
+                    return;
+                }
+                if (oldPassword === newPassword) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '新密码不能与当前密码相同' }));
+                    return;
+                }
+                user.password = hashPassword(newPassword);
+                await usersDb.write();
+                console.log(`用户修改密码: ${userId}`);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, msg: '密码修改成功' }));
+            } catch (e) {
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, msg: e.message }));
+            }
+        })();
+        return;
+    }
+
     // 通过用户ID重置昵称和密码（忘记账号功能）
     if (req.url === '/api/user/resetNickById' && req.method === 'POST') {
         (async () => {

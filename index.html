@@ -3226,12 +3226,17 @@ body.guest-mode .manual-score-btn {
 
     <!-- 重新设计的身份选择面板 - 十字布局 -->
     <div id="identitySelectionPanel" class="identity-selection-panel">
-        <div style="position:absolute; top:15px; left:15px; display:flex; gap:8px; align-items:center;">
-            <button id="initNicknameBtn" style="background:linear-gradient(135deg,#667eea,#764ba2); border:none; border-radius:50%; width:44px; height:44px; cursor:pointer; font-size:1.1rem; color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(102,126,234,0.4); transition:all 0.3s; position:relative;" title="修改用户名">
-                <i class="fas fa-user-edit"></i>
-                <span id="wxQrcodeBadge" style="display:none; position:absolute; top:-2px; right:-2px; width:12px; height:12px; background:#ff3b30; border:2px solid #fff; border-radius:50%;"></span>
+        <div style="position:absolute; top:15px; left:15px; display:flex; flex-direction:column; align-items:flex-start; gap:6px;">
+            <div style="display:flex; gap:8px; align-items:center;">
+                <button id="initNicknameBtn" style="background:linear-gradient(135deg,#667eea,#764ba2); border:none; border-radius:50%; width:44px; height:44px; cursor:pointer; font-size:1.1rem; color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(102,126,234,0.4); transition:all 0.3s; position:relative;" title="修改用户名">
+                    <i class="fas fa-user-edit"></i>
+                    <span id="wxQrcodeBadge" style="display:none; position:absolute; top:-2px; right:-2px; width:12px; height:12px; background:#ff3b30; border:2px solid #fff; border-radius:50%;"></span>
+                </button>
+                <div id="initUserLabel" style="display:none; background:rgba(255,255,255,0.9); border-radius:20px; padding:6px 12px; font-size:0.8rem; color:#444; box-shadow:0 2px 8px rgba(0,0,0,0.12); cursor:pointer; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="点击修改用户名"></div>
+            </div>
+            <button id="initChangePwdBtn" style="display:none; background:rgba(255,255,255,0.85); border:none; border-radius:14px; padding:4px 12px; font-size:0.72rem; color:#667eea; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,0.1);" title="修改密码">
+                <i class="fas fa-lock"></i> 修改密码
             </button>
-            <div id="initUserLabel" style="display:none; background:rgba(255,255,255,0.9); border-radius:20px; padding:6px 12px; font-size:0.8rem; color:#444; box-shadow:0 2px 8px rgba(0,0,0,0.12); cursor:pointer; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="点击修改用户名"></div>
         </div>
         <div style="position:absolute; top:15px; right:15px; display:flex; gap:8px; align-items:center;">
             <button id="initHistoryBtn" style="background:linear-gradient(135deg,#667eea,#764ba2); border:none; border-radius:50%; width:44px; height:44px; cursor:pointer; font-size:1.1rem; color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(102,126,234,0.4); transition:all 0.3s;" title="历史结算记录">
@@ -5796,6 +5801,13 @@ body.guest-mode .manual-score-btn {
 
                 // 先快速探测服务器是否可达：若不可达直接弹出连接配置面板
                 probeAndConnect();
+
+                // 未记录玩家登录信息时，弹窗提示玩家登录（可关闭后以游客身份观战）
+                try {
+                    if (!getCurrentUser()) {
+                        setTimeout(function() { showUserAuthPanel(); }, 600);
+                    }
+                } catch(e) { console.warn('自动提示登录失败:', e); }
             } catch (error) {
                 console.error('初始化失败:', error);
                 // 初始化失败时，进入身份选择页面
@@ -8489,9 +8501,9 @@ body.guest-mode .manual-score-btn {
             let queue = getPendingRemarkQueue().filter(function(x) { return x.id !== id; });
             queue.push({ id: id, remark: remark, time: Date.now() });
             savePendingRemarkQueue(queue);
-            // 尝试上传到云端
+            // 尝试上传到云端（用 userApiUrl 保证 file:// 或跨源部署时也能拼对地址）
             try {
-                const resp = await fetch('/api/update-settlement-remark', {
+                const resp = await fetch(userApiUrl('/api/update-settlement-remark'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id: id, remark: remark })
@@ -9263,17 +9275,21 @@ body.guest-mode .manual-score-btn {
                 if (container) renderOfflineSettlementHistory(container);
                 showNotification('备注已保存，联网后自动同步', 'success', 2000);
             } else {
-                fetch('/api/update-settlement-remark', {
+                fetch(userApiUrl('/api/update-settlement-remark'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id: settlementId, remark: trimmed })
                 }).then(res => res.json()).then(data => {
                     if (data.success) {
+                        // 同步更新本地缓存，保证断网/重启后一致
+                        updateLocalSettlementRemark(settlementId, trimmed);
                         renderSettlementHistory();
                         showNotification('备注已保存', 'success', 2000);
                     }
                 }).catch(e => {
-                    showNotification('保存失败', 'error', 2000);
+                    // 网络失败时走离线待同步队列
+                    saveRemarkWithSync(settlementId, trimmed);
+                    showNotification('备注已保存，联网后自动同步', 'success', 2000);
                 });
             }
             });
@@ -10108,9 +10124,9 @@ body.guest-mode .manual-score-btn {
                     try {
                         var controller = new AbortController();
                         var timeoutId = setTimeout(function() { controller.abort(); }, 3000);
-                        var response = await fetch('/api/update-settlement-remark', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: settlement.id, remark: remark }), signal: controller.signal });
+                        var response = await fetch(userApiUrl('/api/update-settlement-remark'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: settlement.id, remark: remark }), signal: controller.signal });
                         clearTimeout(timeoutId);
-                        if (response.ok) { settlement.remark = remark; remarkBtn.textContent = '已保存'; showNotification('备注已保存', 'success', 2000); try { renderSettlementHistory(); } catch(e) {} }
+                        if (response.ok) { settlement.remark = remark; updateLocalSettlementRemark(settlement.id, remark); remarkBtn.textContent = '已保存'; showNotification('备注已保存', 'success', 2000); try { renderSettlementHistory(); } catch(e) {} }
                         else throw new Error('API failed');
                     } catch(e) {
                         saveRemarkWithSync(settlement.id, remark);
@@ -12059,11 +12075,14 @@ body.guest-mode .manual-score-btn {
 
     <!-- ===== 用户注册/登录面板 ===== -->
     <div id="userAuthPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:100000; align-items:center; justify-content:center; padding:20px;">
-        <div style="background:#fff; border-radius:16px; width:100%; max-width:360px; padding:28px 24px; box-shadow:0 20px 60px rgba(0,0,0,0.3); max-height:90vh; overflow-y:auto;">
+        <div style="background:#fff; border-radius:16px; width:100%; max-width:360px; padding:28px 24px 20px; box-shadow:0 20px 60px rgba(0,0,0,0.3); max-height:90vh; overflow-y:auto; position:relative;">
+            <button id="uaCloseBtn" title="关闭" style="position:absolute; top:10px; right:10px; width:30px; height:30px; border:none; border-radius:50%; background:#f0f2f5; color:#888; font-size:1rem; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                <i class="fas fa-times"></i>
+            </button>
             <div style="text-align:center; margin-bottom:6px;">
                 <i class="fas fa-id-card" style="font-size:2.4rem; color:#667eea;"></i>
-                <h3 style="margin:10px 0 4px; font-size:1.25rem; color:#333;">账号注册 / 登录</h3>
-                <div style="font-size:0.8rem; color:#888; line-height:1.5;">注册后系统自动生成用户ID<br>并统计您的历史总分与总胜率</div>
+                <h3 id="uaTitle" style="margin:10px 0 4px; font-size:1.25rem; color:#333;">登录</h3>
+                <div id="uaSubtitle" style="font-size:0.8rem; color:#888; line-height:1.5;">登录后自动同步对局记录与备注<br>并统计您的历史总分与总胜率</div>
             </div>
 
             <div style="margin:18px 0 6px; font-size:0.85rem; font-weight:bold; color:#555;">昵称 <span style="color:#e74c3c;">*</span> <span style="color:#999; font-weight:normal;">（即账号，1-20字，不可重复）</span></div>
@@ -12071,23 +12090,31 @@ body.guest-mode .manual-score-btn {
                 style="width:100%; box-sizing:border-box; padding:12px 14px; border:2px solid #e0e0e0; border-radius:10px; font-size:1rem; outline:none; transition:border-color 0.2s;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
 
             <div style="margin:14px 0 6px; font-size:0.85rem; font-weight:bold; color:#555;">密码 <span style="color:#e74c3c;">*</span></div>
-            <input type="password" id="uaPasswordInput" placeholder="设置/输入密码（无格式限制）" autocomplete="off"
+            <input type="password" id="uaPasswordInput" placeholder="请输入密码" autocomplete="off"
                 style="width:100%; box-sizing:border-box; padding:12px 14px; border:2px solid #e0e0e0; border-radius:10px; font-size:1rem; outline:none; transition:border-color 0.2s;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
 
             <div id="uaStatus" style="display:none; margin-top:12px; padding:10px 12px; border-radius:8px; font-size:0.85rem;"></div>
 
-            <button id="uaRegisterBtn" style="width:100%; margin-top:18px; padding:13px; background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; border:none; border-radius:10px; font-size:1rem; font-weight:bold; cursor:pointer; box-shadow:0 4px 14px rgba(102,126,234,0.4);">
-                <i class="fas fa-user-plus"></i> 注册并进入
+            <!-- 突出的大登录按钮 -->
+            <button id="uaLoginBtn" style="width:100%; margin-top:18px; padding:14px; background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; border:none; border-radius:10px; font-size:1.05rem; font-weight:bold; cursor:pointer; box-shadow:0 5px 16px rgba(102,126,234,0.45); transition:opacity 0.2s, transform 0.1s;" onmouseover="this.style.opacity=0.9" onmouseout="this.style.opacity=1" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
+                <i class="fas fa-sign-in-alt"></i> 登录
             </button>
-            <button id="uaLoginBtn" style="width:100%; margin-top:10px; padding:13px; background:#f0f2f5; color:#444; border:none; border-radius:10px; font-size:1rem; font-weight:bold; cursor:pointer;">
-                <i class="fas fa-sign-in-alt"></i> 已有账号，登录
-            </button>
+
+            <!-- 注册改为小字链接 -->
+            <div style="text-align:center; margin-top:14px; font-size:0.82rem; color:#999;">
+                <span id="uaSwitchHint">没有账号？</span>
+                <button id="uaRegisterLink" style="background:none; border:none; padding:0; font-size:0.82rem; color:#667eea; cursor:pointer; text-decoration:underline;">立即注册</button>
+            </div>
+
+            <!-- 其他小字功能链接 -->
+            <div style="display:flex; justify-content:center; gap:20px; margin-top:8px;">
+                <button id="uaForgotBtn" style="background:none; border:none; padding:4px 0; color:#999; font-size:0.78rem; cursor:pointer; text-decoration:underline;">忘记账号？通过ID重置</button>
+                <button id="uaChangePwdLink" style="background:none; border:none; padding:4px 0; color:#999; font-size:0.78rem; cursor:pointer; text-decoration:underline;">修改密码</button>
+            </div>
+
             <div id="uaCurrentUser" style="display:none; margin-top:14px; padding:10px 12px; background:#eef2ff; border-radius:8px; font-size:0.82rem; color:#444; text-align:center;"></div>
             <button id="uaSwitchBtn" style="display:none; width:100%; margin-top:10px; padding:10px; background:transparent; color:#667eea; border:none; border-radius:10px; font-size:0.85rem; cursor:pointer;">
                 切换账号
-            </button>
-            <button id="uaForgotBtn" style="width:100%; margin-top:6px; padding:8px; background:transparent; color:#999; border:none; border-radius:10px; font-size:0.82rem; cursor:pointer; text-decoration:underline;">
-                忘记账号？通过ID重置
             </button>
         </div>
     </div>
@@ -12152,6 +12179,28 @@ body.guest-mode .manual-score-btn {
         </div>
     </div>
 
+    <!-- ===== 修改密码面板 ===== -->
+    <div id="passwordEditPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:100006; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#fff; border-radius:16px; width:100%; max-width:340px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+            <h3 style="margin:0 0 6px; font-size:1.1rem; color:#333;"><i class="fas fa-lock" style="color:#667eea;"></i> 修改密码</h3>
+            <div id="peCurrent" style="font-size:0.8rem; color:#888; margin-bottom:14px;"></div>
+            <div style="font-size:0.85rem; font-weight:bold; color:#555; margin-bottom:6px;">当前密码</div>
+            <input type="password" id="peOldPasswordInput" placeholder="输入当前密码" autocomplete="off"
+                style="width:100%; box-sizing:border-box; padding:11px 13px; border:2px solid #e0e0e0; border-radius:9px; font-size:0.96rem; outline:none;">
+            <div style="font-size:0.85rem; font-weight:bold; color:#555; margin:14px 0 6px;">新密码</div>
+            <input type="password" id="peNewPasswordInput" placeholder="输入新密码" autocomplete="off"
+                style="width:100%; box-sizing:border-box; padding:11px 13px; border:2px solid #e0e0e0; border-radius:9px; font-size:0.96rem; outline:none;">
+            <div style="font-size:0.85rem; font-weight:bold; color:#555; margin:14px 0 6px;">确认新密码</div>
+            <input type="password" id="peConfirmInput" placeholder="再次输入新密码" autocomplete="off"
+                style="width:100%; box-sizing:border-box; padding:11px 13px; border:2px solid #e0e0e0; border-radius:9px; font-size:0.96rem; outline:none;">
+            <div id="peStatus" style="display:none; margin-top:12px; padding:9px 12px; border-radius:8px; font-size:0.84rem;"></div>
+            <div style="display:flex; gap:10px; margin-top:18px;">
+                <button id="peCancelBtn" style="flex:1; padding:12px; background:#f0f2f5; color:#444; border:none; border-radius:10px; font-size:0.95rem; cursor:pointer;">取消</button>
+                <button id="peSaveBtn" style="flex:1; padding:12px; background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; border:none; border-radius:10px; font-size:0.95rem; font-weight:bold; cursor:pointer;">保存</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== 排行榜面板 ===== -->
     <div id="leaderboardPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:100003; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:16px; width:100%; max-width:400px; padding:22px; box-shadow:0 20px 60px rgba(0,0,0,0.3); max-height:88vh; overflow-y:auto;">
@@ -12211,6 +12260,30 @@ body.guest-mode .manual-score-btn {
         // 显示注册/登录面板，返回 Promise：resolve({action:'register'|'login', user})
         // 已登录时自动填充昵称，可直接进入（或切换账号）
         let uaResolve = null;
+        let uaMode = 'login'; // 'login' | 'register'
+        // 切换登录/注册模式：注册入口改为小字，登录为主按钮
+        function setAuthMode(mode) {
+            uaMode = mode === 'register' ? 'register' : 'login';
+            const title = document.getElementById('uaTitle');
+            const subtitle = document.getElementById('uaSubtitle');
+            const loginBtn = document.getElementById('uaLoginBtn');
+            const registerLink = document.getElementById('uaRegisterLink');
+            const switchHint = document.getElementById('uaSwitchHint');
+            const existing = getCurrentUser();
+            if (uaMode === 'register') {
+                if (title) title.textContent = '注册新账号';
+                if (subtitle) subtitle.innerHTML = '注册后系统自动生成用户ID<br>并统计您的历史总分与总胜率';
+                if (loginBtn) loginBtn.innerHTML = '<i class="fas fa-user-plus"></i> 注册并进入';
+                if (registerLink) registerLink.textContent = '已有账号，去登录';
+                if (switchHint) switchHint.textContent = '';
+            } else {
+                if (title) title.textContent = '登录';
+                if (subtitle) subtitle.innerHTML = '登录后自动同步对局记录与备注<br>并统计您的历史总分与总胜率';
+                if (loginBtn) loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> 登录';
+                if (registerLink) registerLink.textContent = '立即注册';
+                if (switchHint) switchHint.textContent = existing ? '切换账号？' : '没有账号？';
+            }
+        }
         function showUserAuthPanel(forceSwitch) {
             return new Promise((resolve) => {
                 uaResolve = resolve;
@@ -12218,11 +12291,12 @@ body.guest-mode .manual-score-btn {
                 const existing = forceSwitch ? null : getCurrentUser();
                 const curEl = document.getElementById('uaCurrentUser');
                 const switchBtn = document.getElementById('uaSwitchBtn');
+                setAuthMode('login');
                 if (existing) {
                     document.getElementById('uaNicknameInput').value = existing.nickname || '';
                     document.getElementById('uaPasswordInput').value = existing.password || '';
                     curEl.style.display = 'block';
-                    curEl.innerHTML = `当前账号：<b>${existing.nickname}</b>（${existing.userId}）<br><span style="color:#888;">直接点“登录”进入，或切换账号</span>`;
+                    curEl.innerHTML = `当前账号：<b>${existing.nickname}</b>（${existing.userId}）<br><span style="color:#888;">直接点“登录”进入，或切换账号 / 修改密码</span>`;
                     switchBtn.style.display = 'block';
                 } else {
                     document.getElementById('uaNicknameInput').value = '';
@@ -12269,6 +12343,7 @@ body.guest-mode .manual-score-btn {
                 if (data.success) {
                     // 注册完自动登录：保存含密码的登录态（后续 join 需校验）
                     setCurrentUser({ userId: data.user.userId, nickname: data.user.nickname, password });
+                    if (typeof updateInitUserLabel === 'function') updateInitUserLabel();
                     showUaStatus(`注册成功！您的用户ID：${data.user.userId}`, 'success');
                     setTimeout(() => closeUserAuthPanel({ action: 'register', user: data.user }), 800);
                 } else {
@@ -12295,6 +12370,7 @@ body.guest-mode .manual-score-btn {
                 const data = await resp.json();
                 if (data.success) {
                     setCurrentUser({ userId: data.user.userId, nickname: data.user.nickname, password });
+                    if (typeof updateInitUserLabel === 'function') updateInitUserLabel();
                     showUaStatus('登录成功！欢迎回来 ' + data.user.nickname, 'success');
                     setTimeout(() => closeUserAuthPanel({ action: 'login', user: data.user }), 600);
                 } else {
@@ -12307,23 +12383,35 @@ body.guest-mode .manual-score-btn {
 
         // 绑定面板按钮
         (function bindUserAuthEvents() {
-            const regBtn = document.getElementById('uaRegisterBtn');
             const loginBtn = document.getElementById('uaLoginBtn');
+            const registerLink = document.getElementById('uaRegisterLink');
             const switchBtn = document.getElementById('uaSwitchBtn');
-            if (regBtn) regBtn.addEventListener('click', doRegister);
-            if (loginBtn) loginBtn.addEventListener('click', doLogin);
+            const closeBtn = document.getElementById('uaCloseBtn');
+            const panel = document.getElementById('userAuthPanel');
+            // 主按钮：登录模式执行登录，注册模式执行注册
+            if (loginBtn) loginBtn.addEventListener('click', function() { if (uaMode === 'register') doRegister(); else doLogin(); });
+            // 注册改为小字链接：点击切换注册/登录模式
+            if (registerLink) registerLink.addEventListener('click', function() {
+                setAuthMode(uaMode === 'register' ? 'login' : 'register');
+                hideUaStatus();
+            });
+            // 关闭按钮：关闭面板（未登录时也可关闭，继续观战）
+            if (closeBtn) closeBtn.addEventListener('click', function() { closeUserAuthPanel(null); });
+            if (panel) panel.addEventListener('click', function(e) { if (e.target === panel) closeUserAuthPanel(null); });
             if (switchBtn) switchBtn.addEventListener('click', function() {
                 clearCurrentUser();
+                if (typeof updateInitUserLabel === 'function') updateInitUserLabel();
                 document.getElementById('uaNicknameInput').value = '';
                 document.getElementById('uaPasswordInput').value = '';
                 document.getElementById('uaCurrentUser').style.display = 'none';
                 switchBtn.style.display = 'none';
+                setAuthMode('login');
                 hideUaStatus();
             });
             const nickInput = document.getElementById('uaNicknameInput');
-            if (nickInput) nickInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
+            if (nickInput) nickInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { if (uaMode === 'register') doRegister(); else doLogin(); } });
             const pwdInput = document.getElementById('uaPasswordInput');
-            if (pwdInput) pwdInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
+            if (pwdInput) pwdInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { if (uaMode === 'register') doRegister(); else doLogin(); } });
 
             // 忘记账号：打开重置面板
             const forgotBtn = document.getElementById('uaForgotBtn');
@@ -12331,6 +12419,18 @@ body.guest-mode .manual-score-btn {
                 document.getElementById('resetUidInput').value = '';
                 document.getElementById('resetStatus').style.display = 'none';
                 document.getElementById('userResetPanel').style.display = 'flex';
+            });
+
+            // 修改密码：已登录直接打开修改密码面板，未登录提示先登录
+            const changePwdLink = document.getElementById('uaChangePwdLink');
+            if (changePwdLink) changePwdLink.addEventListener('click', function() {
+                const me = getCurrentUser();
+                if (!me) {
+                    showUaStatus('请先登录后再修改密码', 'error');
+                    return;
+                }
+                closeUserAuthPanel(null);
+                if (typeof showPasswordEditPanel === 'function') showPasswordEditPanel();
             });
         })();
 
@@ -12645,6 +12745,56 @@ body.guest-mode .manual-score-btn {
             }
         }
 
+        // ==================== 修改密码 ====================
+        function showPasswordEditPanel() {
+            const me = getCurrentUser();
+            const panel = document.getElementById('passwordEditPanel');
+            if (!me) { showNotification('请先登录', 'warning', 2500); showUserAuthPanel(); return; }
+            document.getElementById('peCurrent').textContent = '当前：' + me.nickname + '（' + me.userId + '）';
+            document.getElementById('peOldPasswordInput').value = '';
+            document.getElementById('peNewPasswordInput').value = '';
+            document.getElementById('peConfirmInput').value = '';
+            document.getElementById('peStatus').style.display = 'none';
+            panel.style.display = 'flex';
+        }
+        function hidePasswordEditPanel() { document.getElementById('passwordEditPanel').style.display = 'none'; }
+
+        async function savePassword() {
+            const me = getCurrentUser();
+            const oldPwd = document.getElementById('peOldPasswordInput').value;
+            const newPwd = document.getElementById('peNewPasswordInput').value;
+            const confirmPwd = document.getElementById('peConfirmInput').value;
+            const st = document.getElementById('peStatus');
+            function setStatus(msg, ok) {
+                st.style.display = 'block'; st.textContent = msg;
+                st.style.background = ok ? '#e8f5e9' : '#fdecea';
+                st.style.color = ok ? '#2e7d32' : '#c62828';
+            }
+            if (!me) { setStatus('请先登录', false); return; }
+            if (!oldPwd) { setStatus('请输入当前密码', false); return; }
+            if (!newPwd) { setStatus('请输入新密码', false); return; }
+            if (newPwd !== confirmPwd) { setStatus('两次输入的新密码不一致', false); return; }
+            try {
+                setStatus('保存中...', true);
+                const resp = await fetch(userApiUrl('/api/user/change-password'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: me.userId, oldPassword: oldPwd, newPassword: newPwd })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    // 同步更新本地登录态中的密码（后续 WS join 校验需要）
+                    setCurrentUser({ userId: me.userId, nickname: me.nickname, password: newPwd });
+                    setStatus('修改成功！请使用新密码登录', true);
+                    setTimeout(hidePasswordEditPanel, 800);
+                } else {
+                    setStatus(data.msg || '修改失败', false);
+                }
+            } catch (e) {
+                setStatus('网络错误: ' + e.message, false);
+            }
+        }
+
         // ==================== 修改用户名 ====================
         function showNicknameEditPanel() {
             const me = getCurrentUser();
@@ -12692,16 +12842,19 @@ body.guest-mode .manual-score-btn {
             }
         }
 
-        // 初始化界面左上角显示当前用户（点击可修改用户名）
+        // 初始化界面左上角显示当前用户（点击可修改用户名），并显示修改密码入口
         function updateInitUserLabel() {
             const me = getCurrentUser();
             const label = document.getElementById('initUserLabel');
+            const pwdBtn = document.getElementById('initChangePwdBtn');
             if (!label) return;
             if (me) {
                 label.style.display = 'block';
                 label.innerHTML = `<i class="fas fa-user"></i> ${escapeHtmlLocal(me.nickname)} <span style="color:#999;font-size:0.72rem;">(${me.userId})</span>`;
+                if (pwdBtn) pwdBtn.style.display = 'block';
             } else {
                 label.style.display = 'none';
+                if (pwdBtn) pwdBtn.style.display = 'none';
             }
         }
 
@@ -12713,6 +12866,14 @@ body.guest-mode .manual-score-btn {
             if (neCancel) neCancel.addEventListener('click', hideNicknameEditPanel);
             const nePanel = document.getElementById('nicknameEditPanel');
             if (nePanel) nePanel.addEventListener('click', function(e) { if (e.target === nePanel) hideNicknameEditPanel(); });
+
+            // 修改密码面板
+            const peSave = document.getElementById('peSaveBtn');
+            const peCancel = document.getElementById('peCancelBtn');
+            if (peSave) peSave.addEventListener('click', savePassword);
+            if (peCancel) peCancel.addEventListener('click', hidePasswordEditPanel);
+            const pePanel = document.getElementById('passwordEditPanel');
+            if (pePanel) pePanel.addEventListener('click', function(e) { if (e.target === pePanel) hidePasswordEditPanel(); });
 
             const lbClose = document.getElementById('lbCloseBtn');
             if (lbClose) lbClose.addEventListener('click', hideLeaderboard);
@@ -12732,6 +12893,9 @@ body.guest-mode .manual-score-btn {
             if (initNickBtn) initNickBtn.addEventListener('click', function() { showNicknameEditPanel(); });
             const initLabel = document.getElementById('initUserLabel');
             if (initLabel) initLabel.addEventListener('click', function() { showNicknameEditPanel(); });
+            // 初始化界面左上角：修改密码
+            const initPwdBtn = document.getElementById('initChangePwdBtn');
+            if (initPwdBtn) initPwdBtn.addEventListener('click', function() { showPasswordEditPanel(); });
 
             // 页面加载后刷新左上角用户信息
             setTimeout(updateInitUserLabel, 300);
