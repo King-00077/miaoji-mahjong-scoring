@@ -3010,12 +3010,12 @@
             transform: translateY(0) scale(0.98);
         }
 
-        #initNicknameBtn:hover {
+        #initUserBtn:hover {
             transform: translateY(-2px) scale(1.05);
             box-shadow: 0 6px 20px rgba(102,126,234,0.5);
         }
 
-        #initNicknameBtn:active {
+        #initUserBtn:active {
             transform: translateY(0) scale(0.98);
         }
 
@@ -3226,16 +3226,10 @@ body.guest-mode .manual-score-btn {
 
     <!-- 重新设计的身份选择面板 - 十字布局 -->
     <div id="identitySelectionPanel" class="identity-selection-panel">
-        <div style="position:absolute; top:15px; left:15px; display:flex; flex-direction:column; align-items:flex-start; gap:6px;">
-            <div style="display:flex; gap:8px; align-items:center;">
-                <button id="initNicknameBtn" style="background:linear-gradient(135deg,#667eea,#764ba2); border:none; border-radius:50%; width:44px; height:44px; cursor:pointer; font-size:1.1rem; color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(102,126,234,0.4); transition:all 0.3s; position:relative;" title="修改用户名">
-                    <i class="fas fa-user-edit"></i>
-                    <span id="wxQrcodeBadge" style="display:none; position:absolute; top:-2px; right:-2px; width:12px; height:12px; background:#ff3b30; border:2px solid #fff; border-radius:50%;"></span>
-                </button>
-                <div id="initUserLabel" style="display:none; background:rgba(255,255,255,0.9); border-radius:20px; padding:6px 12px; font-size:0.8rem; color:#444; box-shadow:0 2px 8px rgba(0,0,0,0.12); cursor:pointer; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="点击修改用户名"></div>
-            </div>
-            <button id="initChangePwdBtn" style="display:none; background:rgba(255,255,255,0.85); border:none; border-radius:14px; padding:4px 12px; font-size:0.72rem; color:#667eea; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,0.1);" title="修改密码">
-                <i class="fas fa-lock"></i> 修改密码
+        <div style="position:absolute; top:15px; left:15px;">
+            <button id="initUserBtn" style="background:linear-gradient(135deg,#667eea,#764ba2); border:none; border-radius:50%; width:44px; height:44px; cursor:pointer; color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(102,126,234,0.4); transition:all 0.3s; position:relative; overflow:hidden;" title="用户信息">
+                <span id="initUserBtnIcon" style="display:flex; align-items:center; justify-content:center; width:100%; height:100%; overflow:hidden; max-width:100%; line-height:1;"><i class="fas fa-user" style="font-size:1.1rem;"></i></span>
+                <span id="wxQrcodeBadge" style="display:none; position:absolute; top:-2px; right:-2px; width:12px; height:12px; background:#ff3b30; border:2px solid #fff; border-radius:50%;"></span>
             </button>
         </div>
         <div style="position:absolute; top:15px; right:15px; display:flex; gap:8px; align-items:center;">
@@ -6762,13 +6756,12 @@ body.guest-mode .manual-score-btn {
                 return;
             }
 
-            // 初始化页面昵称设置按钮
-            const initNicknameBtn = document.getElementById('initNicknameBtn');
-            if (initNicknameBtn) {
-                initNicknameBtn.addEventListener('click', function() {
-                    // 改为打开"修改用户名"面板（同步服务器账号昵称）
-                    if (typeof showNicknameEditPanel === 'function') showNicknameEditPanel();
-                    else showNicknameModal();
+            // 初始化页面左上角用户信息按钮：点击弹出用户信息（含战绩/修改用户名/修改密码）
+            const initUserBtn = document.getElementById('initUserBtn');
+            if (initUserBtn) {
+                initUserBtn.addEventListener('click', function() {
+                    if (typeof showUserInfoPanel === 'function') showUserInfoPanel();
+                    else if (typeof showNicknameEditPanel === 'function') showNicknameEditPanel();
                 });
             }
 
@@ -12179,6 +12172,29 @@ body.guest-mode .manual-score-btn {
         </div>
     </div>
 
+    <!-- ===== 用户信息弹窗（左上角用户按钮） ===== -->
+    <div id="userInfoPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:100002; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#fff; border-radius:16px; width:100%; max-width:360px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.3); max-height:85vh; overflow-y:auto;">
+            <div id="uiLoginState" style="display:none;">
+                <div style="text-align:center;">
+                    <div id="uiAvatar" style="width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.6rem; font-weight:bold; margin:0 auto; overflow:hidden;">?</div>
+                    <div id="uiNickname" style="font-size:1.15rem; font-weight:bold; color:#333; margin-top:10px;"></div>
+                    <div id="uiUserId" style="font-size:0.78rem; color:#999; margin-top:2px;"></div>
+                </div>
+                <div id="uiStats" style="margin-top:16px;"></div>
+                <div style="display:flex; gap:10px; margin-top:16px;">
+                    <button id="uiEditNickBtn" style="flex:1; padding:11px; background:#eef2ff; color:#667eea; border:none; border-radius:10px; font-size:0.92rem; font-weight:bold; cursor:pointer;"><i class="fas fa-user-edit"></i> 修改用户名</button>
+                    <button id="uiEditPwdBtn" style="flex:1; padding:11px; background:#eef2ff; color:#667eea; border:none; border-radius:10px; font-size:0.92rem; font-weight:bold; cursor:pointer;"><i class="fas fa-lock"></i> 修改密码</button>
+                </div>
+            </div>
+            <div id="uiNotLogin" style="display:none; text-align:center; padding:20px 0 6px;">
+                <div style="font-size:0.95rem; color:#666; margin-bottom:14px;"><i class="fas fa-user-circle" style="color:#667eea; font-size:2rem;"></i><br><span style="display:inline-block; margin-top:6px;">未登录，登录后可查看您的战绩与排名</span></div>
+                <button id="uiGoLoginBtn" style="width:100%; padding:13px; background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; border:none; border-radius:10px; font-size:1rem; font-weight:bold; cursor:pointer;"><i class="fas fa-sign-in-alt"></i> 去登录 / 注册</button>
+            </div>
+            <button id="uiCloseBtn" style="width:100%; margin-top:14px; padding:10px; background:#f0f2f5; color:#666; border:none; border-radius:10px; font-size:0.9rem; cursor:pointer;">关闭</button>
+        </div>
+    </div>
+
     <!-- ===== 修改密码面板 ===== -->
     <div id="passwordEditPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:100006; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:16px; width:100%; max-width:340px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
@@ -12343,7 +12359,7 @@ body.guest-mode .manual-score-btn {
                 if (data.success) {
                     // 注册完自动登录：保存含密码的登录态（后续 join 需校验）
                     setCurrentUser({ userId: data.user.userId, nickname: data.user.nickname, password });
-                    if (typeof updateInitUserLabel === 'function') updateInitUserLabel();
+                    if (typeof updateInitUserBtn === 'function') updateInitUserBtn();
                     showUaStatus(`注册成功！您的用户ID：${data.user.userId}`, 'success');
                     setTimeout(() => closeUserAuthPanel({ action: 'register', user: data.user }), 800);
                 } else {
@@ -12370,7 +12386,7 @@ body.guest-mode .manual-score-btn {
                 const data = await resp.json();
                 if (data.success) {
                     setCurrentUser({ userId: data.user.userId, nickname: data.user.nickname, password });
-                    if (typeof updateInitUserLabel === 'function') updateInitUserLabel();
+                    if (typeof updateInitUserBtn === 'function') updateInitUserBtn();
                     showUaStatus('登录成功！欢迎回来 ' + data.user.nickname, 'success');
                     setTimeout(() => closeUserAuthPanel({ action: 'login', user: data.user }), 600);
                 } else {
@@ -12400,7 +12416,7 @@ body.guest-mode .manual-score-btn {
             if (panel) panel.addEventListener('click', function(e) { if (e.target === panel) closeUserAuthPanel(null); });
             if (switchBtn) switchBtn.addEventListener('click', function() {
                 clearCurrentUser();
-                if (typeof updateInitUserLabel === 'function') updateInitUserLabel();
+                if (typeof updateInitUserBtn === 'function') updateInitUserBtn();
                 document.getElementById('uaNicknameInput').value = '';
                 document.getElementById('uaPasswordInput').value = '';
                 document.getElementById('uaCurrentUser').style.display = 'none';
@@ -12832,7 +12848,7 @@ body.guest-mode .manual-score-btn {
                 if (data.success) {
                     setCurrentUser({ userId: me.userId, nickname: data.user.nickname, password: pwd });
                     setStatus('修改成功！', true);
-                    updateInitUserLabel();
+                    updateInitUserBtn();
                     setTimeout(hideNicknameEditPanel, 700);
                 } else {
                     setStatus(data.msg || '修改失败', false);
@@ -12842,19 +12858,90 @@ body.guest-mode .manual-score-btn {
             }
         }
 
-        // 初始化界面左上角显示当前用户（点击可修改用户名），并显示修改密码入口
-        function updateInitUserLabel() {
+        // 初始化界面左上角用户按钮：已登录显示昵称首字头像（不超出按钮），未登录显示默认图标
+        function updateInitUserBtn() {
+            const btn = document.getElementById('initUserBtn');
+            const icon = document.getElementById('initUserBtnIcon');
+            if (!btn || !icon) return;
             const me = getCurrentUser();
-            const label = document.getElementById('initUserLabel');
-            const pwdBtn = document.getElementById('initChangePwdBtn');
-            if (!label) return;
-            if (me) {
-                label.style.display = 'block';
-                label.innerHTML = `<i class="fas fa-user"></i> ${escapeHtmlLocal(me.nickname)} <span style="color:#999;font-size:0.72rem;">(${me.userId})</span>`;
-                if (pwdBtn) pwdBtn.style.display = 'block';
+            if (me && me.nickname) {
+                const ch = Array.from(String(me.nickname).trim())[0] || '?';
+                icon.innerHTML = '<span style="font-size:1.05rem; font-weight:bold; color:#fff; display:block; line-height:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; padding:0 2px;">' + escapeHtmlLocal(ch) + '</span>';
+                btn.title = '用户信息：' + me.nickname + '（' + me.userId + '）';
             } else {
-                label.style.display = 'none';
-                if (pwdBtn) pwdBtn.style.display = 'none';
+                icon.innerHTML = '<i class="fas fa-user" style="font-size:1.1rem;"></i>';
+                btn.title = '登录 / 注册';
+            }
+        }
+
+        // ==================== 用户信息弹窗（左上角用户按钮） ====================
+        function showUserInfoPanel() {
+            const panel = document.getElementById('userInfoPanel');
+            if (!panel) return;
+            const me = getCurrentUser();
+            const loginState = document.getElementById('uiLoginState');
+            const notLoginState = document.getElementById('uiNotLogin');
+            if (!me) {
+                if (loginState) loginState.style.display = 'none';
+                if (notLoginState) notLoginState.style.display = 'block';
+                panel.style.display = 'flex';
+                return;
+            }
+            if (notLoginState) notLoginState.style.display = 'none';
+            if (loginState) loginState.style.display = 'block';
+            const avatar = document.getElementById('uiAvatar');
+            const ch = Array.from(String(me.nickname).trim())[0] || '?';
+            if (avatar) avatar.textContent = ch;
+            const nick = document.getElementById('uiNickname');
+            if (nick) nick.textContent = me.nickname;
+            const uid = document.getElementById('uiUserId');
+            if (uid) uid.textContent = 'ID: ' + me.userId;
+            const statsEl = document.getElementById('uiStats');
+            if (statsEl) statsEl.innerHTML = '<div style="text-align:center;color:#999;padding:20px 0;"><i class="fas fa-spinner fa-spin"></i> 加载战绩中...</div>';
+            panel.style.display = 'flex';
+            renderUserInfoStats(me);
+        }
+
+        function hideUserInfoPanel() {
+            const panel = document.getElementById('userInfoPanel');
+            if (panel) panel.style.display = 'none';
+        }
+
+        // 加载本人战绩与排名（复用 /api/user/stats + 排行榜接口）
+        async function renderUserInfoStats(me) {
+            const statsEl = document.getElementById('uiStats');
+            if (!statsEl) return;
+            try {
+                const resp = await fetch(userApiUrl('/api/user/stats?userId=' + encodeURIComponent(me.userId)));
+                const data = await resp.json();
+                if (!data.success) { statsEl.innerHTML = '<div style="text-align:center;color:#c62828;padding:16px 0;">' + (data.msg || '加载失败') + '</div>'; return; }
+                const s = data.stats;
+                const scoreColor = s.totalScore > 0 ? '#2e7d32' : (s.totalScore < 0 ? '#c62828' : '#666');
+                let rankText = '暂无排名';
+                try {
+                    const lbResp = await fetch(userApiUrl('/api/user/leaderboard?sortBy=totalScore'));
+                    const lbData = await lbResp.json();
+                    if (lbData.success) {
+                        const mine = (lbData.list || []).find(x => x.userId === me.userId);
+                        if (mine && mine.rankByScore) rankText = '第 ' + mine.rankByScore + ' 名 / 共 ' + lbData.list.length + ' 人';
+                    }
+                } catch (e) {}
+                statsEl.innerHTML = `
+                    <div style="background:linear-gradient(135deg,#667eea18,#764ba218); border:1px solid #667eea33; border-radius:12px; padding:14px;">
+                        <div style="display:flex; justify-content:space-between; text-align:center;">
+                            <div style="flex:1;"><div style="font-size:1.35rem; font-weight:bold; color:#f5a623;">${s.roundWinRate}%</div><div style="font-size:0.7rem; color:#888;">总胜率</div></div>
+                            <div style="flex:1;"><div style="font-size:1.35rem; font-weight:bold; color:#333;">${s.totalRounds}</div><div style="font-size:0.7rem; color:#888;">总局数</div></div>
+                            <div style="flex:1;"><div style="font-size:1.35rem; font-weight:bold; color:#2e7d32;">${s.winRounds}</div><div style="font-size:0.7rem; color:#888;">胜局</div></div>
+                            <div style="flex:1;"><div style="font-size:1.35rem; font-weight:bold; color:${scoreColor};">${s.totalScore > 0 ? '+' : ''}${s.totalScore}</div><div style="font-size:0.7rem; color:#888;">累计得分</div></div>
+                        </div>
+                        <div style="margin-top:10px; padding-top:8px; border-top:1px dashed #ccc; font-size:0.78rem; color:#888; display:flex; justify-content:space-between;">
+                            <span>参与 ${s.sessions} 场 · 赢 ${s.winSessions} 场（${s.sessionWinRate}%）</span>
+                            <span style="color:#667eea; font-weight:bold;">${rankText}</span>
+                        </div>
+                    </div>
+                    <div style="margin-top:10px; font-size:0.72rem; color:#aaa; text-align:center;">对局明细请在"历史记录 → 我的战绩"中查看</div>`;
+            } catch (e) {
+                statsEl.innerHTML = '<div style="text-align:center;color:#c62828;padding:16px 0;">网络错误: ' + e.message + '</div>';
             }
         }
 
@@ -12888,17 +12975,22 @@ body.guest-mode .manual-score-btn {
             const wlPanel = document.getElementById('winLossPanel');
             if (wlPanel) wlPanel.addEventListener('click', function(e) { if (e.target === wlPanel) wlPanel.style.display = 'none'; });
 
-            // 初始化界面左上角：修改用户名
-            const initNickBtn = document.getElementById('initNicknameBtn');
-            if (initNickBtn) initNickBtn.addEventListener('click', function() { showNicknameEditPanel(); });
-            const initLabel = document.getElementById('initUserLabel');
-            if (initLabel) initLabel.addEventListener('click', function() { showNicknameEditPanel(); });
-            // 初始化界面左上角：修改密码
-            const initPwdBtn = document.getElementById('initChangePwdBtn');
-            if (initPwdBtn) initPwdBtn.addEventListener('click', function() { showPasswordEditPanel(); });
+            // 初始化界面左上角：用户信息弹窗按钮绑定（点击逻辑在 initEventListeners 中，这里只负责渲染与面板绑定）
+            (function bindUserInfoEvents() {
+                const closeBtn = document.getElementById('uiCloseBtn');
+                if (closeBtn) closeBtn.addEventListener('click', hideUserInfoPanel);
+                const panel = document.getElementById('userInfoPanel');
+                if (panel) panel.addEventListener('click', function(e) { if (e.target === panel) hideUserInfoPanel(); });
+                const editNick = document.getElementById('uiEditNickBtn');
+                if (editNick) editNick.addEventListener('click', function() { hideUserInfoPanel(); showNicknameEditPanel(); });
+                const editPwd = document.getElementById('uiEditPwdBtn');
+                if (editPwd) editPwd.addEventListener('click', function() { hideUserInfoPanel(); showPasswordEditPanel(); });
+                const goLogin = document.getElementById('uiGoLoginBtn');
+                if (goLogin) goLogin.addEventListener('click', function() { hideUserInfoPanel(); showUserAuthPanel(); });
+            })();
 
-            // 页面加载后刷新左上角用户信息
-            setTimeout(updateInitUserLabel, 300);
+            // 页面加载后刷新左上角用户按钮
+            setTimeout(updateInitUserBtn, 300);
         })();
     </script>
 
