@@ -5823,12 +5823,12 @@ body.guest-mode .manual-score-btn {
                 // 先快速探测服务器是否可达：若不可达直接弹出连接配置面板
                 probeAndConnect();
 
-                // 未记录玩家登录信息时：不再强制弹出登录窗，改为顶部温和提示（点击提示条或左上角头像可登录）
+                // 未记录玩家登录信息时，自动弹出登录窗提示玩家登录（可关闭后以游客身份观战）
                 try {
                     if (!getCurrentUser()) {
-                        setTimeout(function() { showLoginNotice(); }, 600);
+                        setTimeout(function() { showUserAuthPanel(); }, 600);
                     }
-                } catch(e) { console.warn('登录提示失败:', e); }
+                } catch(e) { console.warn('自动提示登录失败:', e); }
             } catch (error) {
                 console.error('初始化失败:', error);
                 // 初始化失败时，进入身份选择页面
@@ -12345,30 +12345,6 @@ body.guest-mode .manual-score-btn {
                 if (switchHint) switchHint.textContent = existing ? '切换账号？' : '没有账号？';
             }
         }
-        // 未登录温和提示条：不阻塞操作，点击弹出登录窗，数秒后自动消失
-        let loginNoticeTimer = null;
-        function showLoginNotice() {
-            try {
-                let el = document.getElementById('loginNoticeBar');
-                if (!el) {
-                    el = document.createElement('div');
-                    el.id = 'loginNoticeBar';
-                    el.style.cssText = 'position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:99999; background:rgba(102,126,234,0.95); color:#fff; padding:10px 18px; border-radius:20px; font-size:0.88rem; box-shadow:0 6px 18px rgba(102,126,234,0.4); cursor:pointer; max-width:86vw; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity 0.3s; touch-action:manipulation;';
-                    el.addEventListener('click', function() { hideLoginNotice(); showUserAuthPanel(); });
-                    document.body.appendChild(el);
-                }
-                el.innerHTML = '<i class="fas fa-user-circle"></i> 未登录 · 点击左上角头像登录';
-                el.style.display = 'block';
-                el.style.opacity = '1';
-                clearTimeout(loginNoticeTimer);
-                loginNoticeTimer = setTimeout(hideLoginNotice, 6000);
-            } catch(e) {}
-        }
-        function hideLoginNotice() {
-            const el = document.getElementById('loginNoticeBar');
-            if (el) { el.style.opacity = '0'; setTimeout(function() { el.style.display = 'none'; }, 300); }
-        }
-
         // 登录/注册按钮处理中状态：禁用按钮 + 转圈提示，避免重复点击与无响应感
         function setUaBtnPending(pending) {
             const btn = document.getElementById('uaLoginBtn');
