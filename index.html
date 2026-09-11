@@ -3248,7 +3248,7 @@ body.guest-mode .manual-score-btn {
     <div id="identitySelectionPanel" class="identity-selection-panel">
         <div style="position:absolute; top:15px; left:15px;">
             <button id="initUserBtn" style="background:linear-gradient(135deg,#667eea,#764ba2); border:none; border-radius:50%; width:44px; height:44px; cursor:pointer; color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(102,126,234,0.4); transition:all 0.3s; position:relative; overflow:hidden;" title="用户信息">
-                <span id="initUserBtnIcon" style="display:flex; align-items:center; justify-content:center; width:100%; height:100%; overflow:hidden; max-width:100%; line-height:1;"><i class="fas fa-user" style="font-size:1.1rem;"></i></span>
+                <span id="initUserBtnIcon" style="display:flex; align-items:center; justify-content:center; width:100%; height:100%; overflow:hidden; max-width:100%; line-height:1;"><svg viewBox="0 0 24 24" width="20" height="20" fill="#fff" style="display:block;"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8V21h19.2v-1.8c0-3.2-6.4-4.8-9.6-4.8z"/></svg></span>
                 <span id="wxQrcodeBadge" style="display:none; position:absolute; top:-2px; right:-2px; width:12px; height:12px; background:#ff3b30; border:2px solid #fff; border-radius:50%;"></span>
             </button>
         </div>
@@ -3314,7 +3314,11 @@ body.guest-mode .manual-score-btn {
     <!-- 主应用 -->
     <div id="mainApp" class="container hidden">
         <!-- 至尊计分王标题 -->
-        <div class="app-title-section">
+        <div class="app-title-section" style="position:relative;">
+            <!-- 计分系统内的用户头像按钮（登录显示昵称首字，未登录显示默认图标） -->
+            <button id="gameUserBtn" style="background:linear-gradient(135deg,#667eea,#764ba2); border:none; border-radius:50%; width:44px; height:44px; cursor:pointer; color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(102,126,234,0.4); transition:all 0.3s; position:absolute; left:12px; top:50%; transform:translateY(-50%); z-index:20; overflow:hidden;" title="用户信息">
+                <span id="gameUserBtnIcon" style="display:flex; align-items:center; justify-content:center; width:100%; height:100%; overflow:hidden; max-width:100%; line-height:1;"><svg viewBox="0 0 24 24" width="20" height="20" fill="#fff" style="display:block;"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8V21h19.2v-1.8c0-3.2-6.4-4.8-9.6-4.8z"/></svg></span>
+            </button>
             <div class="app-title-wrap">
                 <h1 class="app-title">至尊计分王</h1>
             </div>
@@ -6814,6 +6818,21 @@ body.guest-mode .manual-score-btn {
             const initUserBtn = document.getElementById('initUserBtn');
             if (initUserBtn) {
                 initUserBtn.addEventListener('click', function() {
+                    if (!getCurrentUser()) {
+                        if (typeof showUserAuthPanel === 'function') showUserAuthPanel();
+                        else if (typeof showUserInfoPanel === 'function') showUserInfoPanel();
+                    } else if (typeof showUserInfoPanel === 'function') {
+                        showUserInfoPanel();
+                    } else if (typeof showNicknameEditPanel === 'function') {
+                        showNicknameEditPanel();
+                    }
+                });
+            }
+
+            // 计分系统界面左上角用户按钮：未登录展开登录页面，已登录弹出用户信息
+            const gameUserBtn = document.getElementById('gameUserBtn');
+            if (gameUserBtn) {
+                gameUserBtn.addEventListener('click', function() {
                     if (!getCurrentUser()) {
                         if (typeof showUserAuthPanel === 'function') showUserAuthPanel();
                         else if (typeof showUserInfoPanel === 'function') showUserInfoPanel();
@@ -12981,18 +13000,25 @@ body.guest-mode .manual-score-btn {
         }
 
         // 初始化界面左上角用户按钮：已登录显示昵称首字头像（不超出按钮），未登录显示默认图标
+        // 同时更新身份选择界面（initUserBtn）与计分系统界面（gameUserBtn）两处按钮
         function updateInitUserBtn() {
-            const btn = document.getElementById('initUserBtn');
-            const icon = document.getElementById('initUserBtnIcon');
-            if (!btn || !icon) return;
             const me = getCurrentUser();
-            if (me && me.nickname) {
-                const ch = Array.from(String(me.nickname).trim())[0] || '?';
-                icon.innerHTML = '<span style="font-size:1.05rem; font-weight:bold; color:#fff; display:block; line-height:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; padding:0 2px;">' + escapeHtmlLocal(ch) + '</span>';
-                btn.title = '用户信息：' + me.nickname + '（' + me.userId + '）';
-            } else {
-                icon.innerHTML = '<i class="fas fa-user" style="font-size:1.1rem;"></i>';
-                btn.title = '登录 / 注册';
+            const pairs = [
+                ['initUserBtn', 'initUserBtnIcon'],
+                ['gameUserBtn', 'gameUserBtnIcon']
+            ];
+            for (let i = 0; i < pairs.length; i++) {
+                const btn = document.getElementById(pairs[i][0]);
+                const icon = document.getElementById(pairs[i][1]);
+                if (!btn || !icon) continue;
+                if (me && me.nickname) {
+                    const ch = Array.from(String(me.nickname).trim())[0] || '?';
+                    icon.innerHTML = '<span style="font-size:1.05rem; font-weight:bold; color:#fff; display:block; line-height:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; padding:0 2px;">' + escapeHtmlLocal(ch) + '</span>';
+                    btn.title = '用户信息：' + me.nickname + '（' + me.userId + '）';
+                } else {
+                    icon.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="#fff" style="display:block;"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8V21h19.2v-1.8c0-3.2-6.4-4.8-9.6-4.8z"/></svg>';
+                    btn.title = '登录 / 注册';
+                }
             }
         }
 
