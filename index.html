@@ -3029,8 +3029,15 @@
             #uaRegisterLink, #uaForgotBtn, #uaChangePwdLink { font-size: 0.85rem; }
         }
         #uaLoginBtn:disabled { opacity: 0.75; cursor: wait; transform: none; }
+        #uaLoginBtn:hover { opacity: 0.9; }
+        #uaLoginBtn:active { transform: scale(0.98); }
         #uaNicknameInput, #uaPasswordInput { touch-action: manipulation; }
         #uaLoginBtn, #uaRegisterLink, #uaForgotBtn, #uaChangePwdLink, #uaCloseBtn { touch-action: manipulation; }
+        /* 弹窗卡片最大高度+滚动：软键盘弹出时按钮不被遮挡，且页面高度不足时可滚动 */
+        #userAuthPanel > div, #userResetPanel > div, #userStatsPanel > div, #nicknameEditPanel > div,
+        #userInfoPanel > div, #passwordEditPanel > div, #leaderboardPanel > div, #winLossPanel > div {
+            max-height: 86vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+        }
 
         #initHistoryBtn:hover {
             transform: translateY(-2px) scale(1.05);
@@ -12120,7 +12127,7 @@ body.guest-mode .manual-score-btn {
     </div>
 
     <!-- ===== 用户注册/登录面板 ===== -->
-    <div id="userAuthPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:100000; align-items:center; justify-content:center; padding:20px;">
+    <div id="userAuthPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:100000; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:16px; width:100%; max-width:360px; padding:28px 24px 20px; box-shadow:0 20px 60px rgba(0,0,0,0.3); max-height:90vh; overflow-y:auto; position:relative;">
             <button id="uaCloseBtn" title="关闭" style="position:absolute; top:10px; right:10px; width:30px; height:30px; border:none; border-radius:50%; background:#f0f2f5; color:#888; font-size:1rem; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center;">
                 <i class="fas fa-times"></i>
@@ -12142,7 +12149,7 @@ body.guest-mode .manual-score-btn {
             <div id="uaStatus" style="display:none; margin-top:12px; padding:10px 12px; border-radius:8px; font-size:0.85rem;"></div>
 
             <!-- 突出的大登录按钮 -->
-            <button id="uaLoginBtn" style="width:100%; margin-top:18px; padding:14px; background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; border:none; border-radius:10px; font-size:1.05rem; font-weight:bold; cursor:pointer; box-shadow:0 5px 16px rgba(102,126,234,0.45); transition:opacity 0.2s, transform 0.1s;" onmouseover="this.style.opacity=0.9" onmouseout="this.style.opacity=1" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
+            <button id="uaLoginBtn" style="width:100%; margin-top:18px; padding:14px; background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; border:none; border-radius:10px; font-size:1.05rem; font-weight:bold; cursor:pointer; box-shadow:0 5px 16px rgba(102,126,234,0.45); transition:opacity 0.2s, transform 0.1s;">
                 <i class="fas fa-sign-in-alt"></i> 登录
             </button>
 
@@ -12166,7 +12173,7 @@ body.guest-mode .manual-score-btn {
     </div>
 
     <!-- ===== 忘记账号/重置面板 ===== -->
-    <div id="userResetPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:100005; align-items:center; justify-content:center; padding:20px;">
+    <div id="userResetPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:100005; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:16px; width:100%; max-width:340px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
             <div style="text-align:center; margin-bottom:10px;">
                 <i class="fas fa-key" style="font-size:2rem; color:#f5a623;"></i>
@@ -12185,7 +12192,7 @@ body.guest-mode .manual-score-btn {
     </div>
 
     <!-- ===== 用户战绩面板 ===== -->
-    <div id="userStatsPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:100001; align-items:center; justify-content:center; padding:20px;">
+    <div id="userStatsPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:100001; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:16px; width:100%; max-width:400px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.3); max-height:88vh; overflow-y:auto;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
                 <h3 style="margin:0; font-size:1.15rem; color:#333;"><i class="fas fa-trophy" style="color:#f5a623;"></i> 战绩统计</h3>
@@ -12207,7 +12214,7 @@ body.guest-mode .manual-score-btn {
     </div>
 
     <!-- ===== 修改用户名面板 ===== -->
-    <div id="nicknameEditPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:100002; align-items:center; justify-content:center; padding:20px;">
+    <div id="nicknameEditPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:100002; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:16px; width:100%; max-width:340px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
             <h3 style="margin:0 0 6px; font-size:1.1rem; color:#333;"><i class="fas fa-user-edit" style="color:#667eea;"></i> 修改用户名</h3>
             <div id="neCurrent" style="font-size:0.8rem; color:#888; margin-bottom:14px;"></div>
@@ -12226,7 +12233,7 @@ body.guest-mode .manual-score-btn {
     </div>
 
     <!-- ===== 用户信息弹窗（左上角用户按钮） ===== -->
-    <div id="userInfoPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:100002; align-items:center; justify-content:center; padding:20px;">
+    <div id="userInfoPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:100002; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:16px; width:100%; max-width:360px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.3); max-height:85vh; overflow-y:auto;">
             <div id="uiLoginState" style="display:none;">
                 <div style="text-align:center;">
@@ -12249,7 +12256,7 @@ body.guest-mode .manual-score-btn {
     </div>
 
     <!-- ===== 修改密码面板 ===== -->
-    <div id="passwordEditPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:100006; align-items:center; justify-content:center; padding:20px;">
+    <div id="passwordEditPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:100006; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:16px; width:100%; max-width:340px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
             <h3 style="margin:0 0 6px; font-size:1.1rem; color:#333;"><i class="fas fa-lock" style="color:#667eea;"></i> 修改密码</h3>
             <div id="peCurrent" style="font-size:0.8rem; color:#888; margin-bottom:14px;"></div>
@@ -12271,7 +12278,7 @@ body.guest-mode .manual-score-btn {
     </div>
 
     <!-- ===== 排行榜面板 ===== -->
-    <div id="leaderboardPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:100003; align-items:center; justify-content:center; padding:20px;">
+    <div id="leaderboardPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:100003; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:16px; width:100%; max-width:400px; padding:22px; box-shadow:0 20px 60px rgba(0,0,0,0.3); max-height:88vh; overflow-y:auto;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
                 <h3 style="margin:0; font-size:1.15rem; color:#333;"><i class="fas fa-crown" style="color:#f5a623;"></i> 排行榜</h3>
@@ -12287,7 +12294,7 @@ body.guest-mode .manual-score-btn {
     </div>
 
     <!-- ===== 胜负场次明细面板 ===== -->
-    <div id="winLossPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:100004; align-items:center; justify-content:center; padding:20px;">
+    <div id="winLossPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:100004; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:16px; width:100%; max-width:400px; padding:22px; box-shadow:0 20px 60px rgba(0,0,0,0.3); max-height:88vh; overflow-y:auto;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
                 <h3 style="margin:0; font-size:1.1rem; color:#333;"><i class="fas fa-chart-bar" style="color:#667eea;"></i> <span id="wlTitle">胜负场次</span></h3>
@@ -12493,7 +12500,24 @@ body.guest-mode .manual-score-btn {
             const closeBtn = document.getElementById('uaCloseBtn');
             const panel = document.getElementById('userAuthPanel');
             // 主按钮：登录模式执行登录，注册模式执行注册
-            if (loginBtn) loginBtn.addEventListener('click', function() { if (uaMode === 'register') doRegister(); else doLogin(); });
+            // 双通道触发（click + touchend）防止 WebView 中点击被吞；防重入避免重复请求
+            let uaAuthBusy = false;
+            function uaMainAction() {
+                if (uaAuthBusy) return;
+                uaAuthBusy = true;
+                const finish = function() { setTimeout(function() { uaAuthBusy = false; }, 600); };
+                let p = null;
+                if (uaMode === 'register') p = doRegister(); else p = doLogin();
+                if (p && typeof p.finally === 'function') p.finally(finish); else finish();
+            }
+            if (loginBtn) {
+                loginBtn.addEventListener('click', function(e) { if (e && e.cancelable) e.preventDefault(); uaMainAction(); });
+                loginBtn.addEventListener('touchend', function(e) {
+                    if (e && e.cancelable) e.preventDefault(); // 阻止合成 click，避免双触发
+                    if (e.target && e.target.closest && !e.target.closest('#uaLoginBtn')) return;
+                    uaMainAction();
+                }, { passive: false });
+            }
             // 注册改为小字链接：点击切换注册/登录模式
             if (registerLink) registerLink.addEventListener('click', function() {
                 setAuthMode(uaMode === 'register' ? 'login' : 'register');
@@ -12515,6 +12539,20 @@ body.guest-mode .manual-score-btn {
             const nickInput = document.getElementById('uaNicknameInput');
             if (nickInput) nickInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { if (uaMode === 'register') doRegister(); else doLogin(); } });
             const pwdInput = document.getElementById('uaPasswordInput');
+            // 软键盘弹出后，把当前输入框滚动到可视区域，避免登录按钮被键盘遮挡
+            function ensureUaInputVisible() {
+                const active = document.activeElement;
+                if (active && (active.id === 'uaNicknameInput' || active.id === 'uaPasswordInput')) {
+                    try { active.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+                    catch (err) { active.scrollIntoView(); }
+                }
+            }
+            [nickInput, pwdInput].forEach(function(el) {
+                if (el) el.addEventListener('focus', function() { setTimeout(ensureUaInputVisible, 350); });
+            });
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', function() { setTimeout(ensureUaInputVisible, 100); });
+            }
             if (pwdInput) pwdInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { if (uaMode === 'register') doRegister(); else doLogin(); } });
 
             // 忘记账号：打开重置面板
