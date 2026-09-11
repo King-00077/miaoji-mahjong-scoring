@@ -3966,7 +3966,15 @@ body.guest-mode .manual-score-btn {
             
             discoverServerAddress().then(wsUrl => {
                 console.log('正在连接到服务器:', wsUrl);
-                ws = new WebSocket(wsUrl);
+                // 已登录时在连接地址上携带 userId，供服务器区分同局域网玩家（IP+用户联合绑定）
+                let finalWsUrl = wsUrl;
+                try {
+                    const _cu = getCurrentUser();
+                    if (_cu && _cu.userId) {
+                        finalWsUrl = wsUrl + (wsUrl.indexOf('?') === -1 ? '?' : '&') + 'userId=' + encodeURIComponent(_cu.userId);
+                    }
+                } catch(e) {}
+                ws = new WebSocket(finalWsUrl);
                 
                 ws.onopen = () => {
                     console.log('成功连接到服务器');
@@ -5823,12 +5831,8 @@ body.guest-mode .manual-score-btn {
                 // 先快速探测服务器是否可达：若不可达直接弹出连接配置面板
                 probeAndConnect();
 
-                // 未记录玩家登录信息时，自动弹出登录窗提示玩家登录（可关闭后以游客身份观战）
-                try {
-                    if (!getCurrentUser()) {
-                        setTimeout(function() { showUserAuthPanel(); }, 600);
-                    }
-                } catch(e) { console.warn('自动提示登录失败:', e); }
+                // 不自动弹出登录窗：登录入口为点击左上角用户按钮（未登录时点击展开登录页）
+                // （曾自动弹出但存在卡死体验问题，按要求改为手动触发）
             } catch (error) {
                 console.error('初始化失败:', error);
                 // 初始化失败时，进入身份选择页面
@@ -12431,6 +12435,8 @@ body.guest-mode .manual-score-btn {
                     // 注册完自动登录：保存含密码的登录态（后续 join 需校验）
                     setCurrentUser({ userId: data.user.userId, nickname: data.user.nickname, password });
                     if (typeof updateInitUserBtn === 'function') updateInitUserBtn();
+                    // 登录态变化后重连 WebSocket（携带 userId），供服务器按 IP+用户区分绑定
+                    setTimeout(function() { if (typeof initWebSocket === 'function') initWebSocket(); }, 300);
                     showUaStatus(`注册成功！您的用户ID：${data.user.userId}`, 'success');
                     setTimeout(() => closeUserAuthPanel({ action: 'register', user: data.user }), 800);
                 } else {
@@ -12461,6 +12467,8 @@ body.guest-mode .manual-score-btn {
                 if (data.success) {
                     setCurrentUser({ userId: data.user.userId, nickname: data.user.nickname, password });
                     if (typeof updateInitUserBtn === 'function') updateInitUserBtn();
+                    // 登录态变化后重连 WebSocket（携带 userId），供服务器按 IP+用户区分绑定
+                    setTimeout(function() { if (typeof initWebSocket === 'function') initWebSocket(); }, 300);
                     showUaStatus('登录成功！欢迎回来 ' + data.user.nickname, 'success');
                     setTimeout(() => closeUserAuthPanel({ action: 'login', user: data.user }), 600);
                 } else {

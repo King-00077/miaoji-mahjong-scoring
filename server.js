@@ -3594,22 +3594,31 @@ wss.on('connection', async function connection(ws, req) {
         }
     }
 
-    // 检查该IP是否已绑定嘴子（数据清除后不进行自动绑定）
+    // 从 WebSocket URL 读取登录用户ID（前端登录后连接时携带），用于区分同局域网玩家
+    let wsUserId = null;
+    try {
+        const _u = new URL(req.url, 'http://localhost');
+        wsUserId = _u.searchParams.get('userId') || null;
+    } catch(e) {}
+
+    // 检查该IP+用户是否已绑定嘴子（数据清除后不进行自动绑定）
+    // 同一局域网玩家共享出口IP，必须叠加 userId 才能正确区分各自绑定，避免互相抢占同一嘴子
     let boundMuzzle = null;
-    if (!dataClearedFlag) {
+    if (!dataClearedFlag && wsUserId) {
         for (let muzzle in playerConnections) {
-            if (playerConnections[muzzle] && playerConnections[muzzle].ipAddress === clientIP && playerConnections[muzzle].isBound) {
+            const _pc = playerConnections[muzzle];
+            if (_pc && _pc.ipAddress === clientIP && _pc.userId === wsUserId && _pc.isBound) {
                 boundMuzzle = muzzle;
                 break;
             }
         }
     }
 
-    // 如果IP已绑定嘴子，自动恢复在线状态（断线重连）
+    // 如果IP+用户已绑定嘴子，自动恢复在线状态（断线重连）
     // 强制注册：只有该座位此前由「已注册用户」入座时才允许自动恢复，
-    // 未注册的座位不做恢复，玩家必须注册登录后重新进入系统
+    // 未登录连接不携带 userId，不做自动恢复
     if (boundMuzzle && !(playerConnections[boundMuzzle] && playerConnections[boundMuzzle].userId)) {
-        console.log(`座位 ${boundMuzzle} 未绑定注册用户，跳过IP自动恢复（${clientIP}）`);
+        console.log(`座位 ${boundMuzzle} 未绑定注册用户，跳过自动恢复（${clientIP}）`);
         boundMuzzle = null;
     }
     if (boundMuzzle) {
@@ -3852,9 +3861,11 @@ wss.on('connection', async function connection(ws, req) {
                     return;
                 }
                 
-                // 清除该IP可能存在的其他嘴子绑定，防止同一IP绑定多个嘴子
+                // 清除该玩家可能存在的其他嘴子绑定：
+                // 同一 IP 且同一 userId 才视为同一玩家，避免同局域网不同账号共享出口IP时互相误清
                 for (let existingMuzzle in playerConnections) {
-                    if (playerConnections[existingMuzzle] && playerConnections[existingMuzzle].ipAddress === clientIP) {
+                    const _pc = playerConnections[existingMuzzle];
+                    if (_pc && _pc.ipAddress === clientIP && _pc.userId === authUser.userId) {
                         delete playerConnections[existingMuzzle];
                         delete occupiedSeats[existingMuzzle];
                         onlinePlayers[existingMuzzle] = false;
