@@ -12131,8 +12131,8 @@ body.guest-mode .manual-score-btn {
                 <div id="uaSubtitle" style="font-size:0.8rem; color:#888; line-height:1.5;">登录后自动同步对局记录与备注<br>并统计您的历史总分与总胜率</div>
             </div>
 
-            <div style="margin:18px 0 6px; font-size:0.85rem; font-weight:bold; color:#555;">昵称 <span style="color:#e74c3c;">*</span> <span style="color:#999; font-weight:normal;">（即账号，1-20字，不可重复）</span></div>
-            <input type="text" id="uaNicknameInput" placeholder="昵称或ID，如 马驰 或 0001" autocomplete="off" maxlength="20"
+            <div style="margin:18px 0 6px; font-size:0.85rem; font-weight:bold; color:#555;">昵称 <span style="color:#e74c3c;">*</span></div>
+            <input type="text" id="uaNicknameInput" placeholder="昵称或ID" autocomplete="off" maxlength="20"
                 style="width:100%; box-sizing:border-box; padding:12px 14px; border:2px solid #e0e0e0; border-radius:10px; font-size:1rem; outline:none; transition:border-color 0.2s;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
 
             <div style="margin:14px 0 6px; font-size:0.85rem; font-weight:bold; color:#555;">密码 <span style="color:#e74c3c;">*</span></div>
@@ -12154,8 +12154,8 @@ body.guest-mode .manual-score-btn {
 
             <!-- 其他小字功能链接 -->
             <div style="display:flex; justify-content:center; gap:20px; margin-top:8px;">
-                <button id="uaForgotBtn" style="background:none; border:none; padding:4px 0; color:#999; font-size:0.78rem; cursor:pointer; text-decoration:underline;">忘记账号？通过ID重置</button>
-                <button id="uaChangePwdLink" style="background:none; border:none; padding:4px 0; color:#999; font-size:0.78rem; cursor:pointer; text-decoration:underline;">修改密码</button>
+                <button id="uaForgotBtn" style="background:none; border:none; padding:4px 0; color:#999; font-size:0.78rem; cursor:pointer; text-decoration:underline;">忘记账号</button>
+                <button id="uaChangePwdLink" style="background:none; border:none; padding:4px 0; color:#999; font-size:0.78rem; cursor:pointer; text-decoration:underline;">忘记密码</button>
             </div>
 
             <div id="uaCurrentUser" style="display:none; margin-top:14px; padding:10px 12px; background:#eef2ff; border-radius:8px; font-size:0.82rem; color:#444; text-align:center;"></div>
@@ -12525,16 +12525,12 @@ body.guest-mode .manual-score-btn {
                 document.getElementById('userResetPanel').style.display = 'flex';
             });
 
-            // 修改密码：已登录直接打开修改密码面板，未登录提示先登录
+            // 忘记密码（未登录）：打开重置面板，输入用户ID即可重置密码
             const changePwdLink = document.getElementById('uaChangePwdLink');
             if (changePwdLink) changePwdLink.addEventListener('click', function() {
-                const me = getCurrentUser();
-                if (!me) {
-                    showUaStatus('请先登录后再修改密码', 'error');
-                    return;
-                }
-                closeUserAuthPanel(null);
-                if (typeof showPasswordEditPanel === 'function') showPasswordEditPanel();
+                document.getElementById('resetUidInput').value = '';
+                document.getElementById('resetStatus').style.display = 'none';
+                document.getElementById('userResetPanel').style.display = 'flex';
             });
         })();
 
