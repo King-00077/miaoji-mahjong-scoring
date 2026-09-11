@@ -259,14 +259,14 @@ function hashPassword(pwd) {
     return crypto.createHash('sha256').update(String(pwd)).digest('hex');
 }
 
-// 自动生成用户ID：u0001、u0002 ...（基于当前最大序号递增）
+// 自动生成用户ID：0001、0002 ...（纯数字，不带头部 u，基于当前最大序号递增）
 function generateUserId(users) {
     let max = 0;
     users.forEach(u => {
-        const m = /^u(\d+)$/.exec(u.userId || '');
+        const m = /^(\d+)$/.exec(String(u.userId || ''));
         if (m) { const n = parseInt(m[1], 10); if (n > max) max = n; }
     });
-    return 'u' + String(max + 1).padStart(4, '0');
+    return String(max + 1).padStart(4, '0');
 }
 
 // 校验用户身份（userId + password），返回用户对象或 null
@@ -300,6 +300,40 @@ async function verifyUser(userId, password) {
             playerConnections: {}
         };
         await db.write();
+    }
+
+    // 迁移：历史用户ID统一去掉 'u' 前缀（u0001 → 0001），仅保留数字
+    // 覆盖 users.json、结算历史、游戏状态、玩家连接绑定，兼容存量数据
+    const stripUPrefix = (id) => /^u\d+$/.test(String(id)) ? String(id).slice(1) : id;
+    let migratedCount = 0;
+    if (usersDb.data.users && Array.isArray(usersDb.data.users)) {
+        for (const _u of usersDb.data.users) {
+            if (/^u\d+$/.test(String(_u.userId || ''))) { _u.userId = stripUPrefix(_u.userId); migratedCount++; }
+        }
+    }
+    if (settlementHistoryDb.data.settlements && Array.isArray(settlementHistoryDb.data.settlements)) {
+        for (const _s of settlementHistoryDb.data.settlements) {
+            for (const _p of (_s.players || [])) {
+                if (_p && /^u\d+$/.test(String(_p.userId || ''))) { _p.userId = stripUPrefix(_p.userId); migratedCount++; }
+            }
+        }
+    }
+    if (db.data.gameState && db.data.gameState.players) {
+        for (const _p of db.data.gameState.players) {
+            if (_p && /^u\d+$/.test(String(_p.userId || ''))) { _p.userId = stripUPrefix(_p.userId); migratedCount++; }
+        }
+    }
+    if (db.data.playerConnections && typeof db.data.playerConnections === 'object') {
+        for (const _muzzle in db.data.playerConnections) {
+            const _pc = db.data.playerConnections[_muzzle];
+            if (_pc && /^u\d+$/.test(String(_pc.userId || ''))) { _pc.userId = stripUPrefix(_pc.userId); migratedCount++; }
+        }
+    }
+    if (migratedCount > 0) {
+        await usersDb.write();
+        await settlementHistoryDb.write();
+        await db.write();
+        console.log(`🔄 用户ID格式迁移完成（去掉u前缀，仅保留数字）: ${migratedCount} 处`);
     }
     
     // 服务器启动时恢复IP绑定的嘴子信息（仅在有实际游戏数据时保留）
@@ -528,19 +562,21 @@ const scoreServer = http.createServer((req, res) => {
         return;
     }
 
-    // 用户登录：昵称 + 密码
+    // 用户登录：昵称 + 密码，或 用户ID + 密码
     if (req.url === '/api/user/login' && req.method === 'POST') {
         (async () => {
             try {
                 const body = await readBody(req);
                 const data = JSON.parse(body || '{}');
-                const nickname = String(data.nickname || '').trim();
+                const loginInput = String(data.nickname || data.userId || '').trim();
                 const password = String(data.password || '');
                 await usersDb.read();
-                const user = (usersDb.data.users || []).find(u => u.nickname === nickname);
+                const users = usersDb.data.users || [];
+                // 优先按昵称匹配，其次按用户ID匹配（支持纯数字ID登录）
+                const user = users.find(u => u.nickname === loginInput) || users.find(u => String(u.userId) === loginInput);
                 if (!user) {
                     res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-                    res.end(JSON.stringify({ success: false, msg: '该昵称未注册' }));
+                    res.end(JSON.stringify({ success: false, msg: '该昵称或ID未注册' }));
                     return;
                 }
                 if (user.password !== hashPassword(password)) {

@@ -3691,8 +3691,12 @@ body.guest-mode .manual-score-btn {
         // 服务器连接面板是否已显示（避免重复弹出）
         let serverConnectPanelShown = false;
 
-        // 内置默认服务器地址：前端直开（file://）或无法自动检测服务器时使用
-        const BUILTIN_SERVER_ADDR = '47.109.52.139:2525';
+        // 内置默认服务器地址（完整 http 地址）：前端直开（file://）或无法自动检测服务器时使用
+        const BUILTIN_SERVER_ADDR = 'http://47.109.52.139:2525';
+        // 从内置地址推导 WebSocket 地址（http→ws / https→wss）
+        function builtinWsUrl() {
+            return BUILTIN_SERVER_ADDR.replace(/^https?:\/\//i, function(m) { return m.toLowerCase() === 'https://' ? 'wss://' : 'ws://'; });
+        }
 
         // 解析监控端主机地址（用于跳转 http://host:5252）
         // 优先级：SERVER_IP_ADDRESS > OVERRIDE_SERVER_WS_URL > localStorage 保存地址 > window.location.hostname
@@ -3851,7 +3855,7 @@ body.guest-mode .manual-score-btn {
 
                 // file:// 直开时主机名为空：使用内置默认服务器地址
                 if (!host) {
-                    return `${protocol}//${BUILTIN_SERVER_ADDR}`;
+                    return builtinWsUrl();
                 }
 
                 return `${protocol}//${SERVER_IP_ADDRESS}:${SERVER_PORT}`;
@@ -5525,7 +5529,7 @@ body.guest-mode .manual-score-btn {
                 return `${window.location.protocol}//${window.location.hostname}:${SERVER_PORT}`;
             }
             // 5. 无法确定服务器地址（file:// 且无保存地址）：使用内置默认服务器
-            return `http://${BUILTIN_SERVER_ADDR}`;
+            return BUILTIN_SERVER_ADDR;
         }
 
         // 服务端 TTS 播放
@@ -5905,7 +5909,7 @@ body.guest-mode .manual-score-btn {
             }
 
             // 当前主机不可达：再探测内置默认服务器地址
-            const builtinUrl = `ws://${BUILTIN_SERVER_ADDR}`;
+            const builtinUrl = builtinWsUrl();
             const builtinOk = await testServerReachable(builtinUrl, 3500);
             if (builtinOk) {
                 try { localStorage.setItem('sc_server_addr', builtinUrl); } catch(e) {}
@@ -12128,7 +12132,7 @@ body.guest-mode .manual-score-btn {
             </div>
 
             <div style="margin:18px 0 6px; font-size:0.85rem; font-weight:bold; color:#555;">昵称 <span style="color:#e74c3c;">*</span> <span style="color:#999; font-weight:normal;">（即账号，1-20字，不可重复）</span></div>
-            <input type="text" id="uaNicknameInput" placeholder="例如 马驰、老王、阿飞" autocomplete="off" maxlength="20"
+            <input type="text" id="uaNicknameInput" placeholder="昵称或ID，如 马驰 或 0001" autocomplete="off" maxlength="20"
                 style="width:100%; box-sizing:border-box; padding:12px 14px; border:2px solid #e0e0e0; border-radius:10px; font-size:1rem; outline:none; transition:border-color 0.2s;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
 
             <div style="margin:14px 0 6px; font-size:0.85rem; font-weight:bold; color:#555;">密码 <span style="color:#e74c3c;">*</span></div>
@@ -12170,7 +12174,7 @@ body.guest-mode .manual-score-btn {
                 <div style="font-size:0.8rem; color:#888; line-height:1.5;">输入您的用户ID，重置后<br>昵称为ID，登录密码为 123456</div>
             </div>
             <div style="margin:16px 0 6px; font-size:0.85rem; font-weight:bold; color:#555;">用户ID</div>
-            <input type="text" id="resetUidInput" placeholder="例如 u0001" autocomplete="off"
+            <input type="text" id="resetUidInput" placeholder="例如 0001" autocomplete="off"
                 style="width:100%; box-sizing:border-box; padding:12px 14px; border:2px solid #e0e0e0; border-radius:10px; font-size:1rem; outline:none; transition:border-color 0.2s;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
             <div id="resetStatus" style="display:none; margin-top:12px; padding:10px 12px; border-radius:8px; font-size:0.85rem;"></div>
             <div style="display:flex; gap:10px; margin-top:18px;">
