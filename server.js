@@ -1412,6 +1412,198 @@ function monitorHandler(req, res) {
         }));
         return;
     }
+
+    // ===== 用户管理（管理端）：删改重置，需管理员密码（与管理端其他管理密码一致）=====
+    const MONITOR_PWD = '8';
+
+    // 校验请求中的管理员密码
+    function monitorAuthCheck(rawBody) {
+        try {
+            const d = JSON.parse(rawBody || '{}');
+            return d.pwd === MONITOR_PWD;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // 获取用户列表
+    if (req.url === '/api/monitor/users' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', async () => {
+            if (!monitorAuthCheck(body)) {
+                res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, msg: '管理员密码错误' }));
+                return;
+            }
+            try {
+                await usersDb.read();
+                const users = (usersDb.data.users || []).map(u => ({
+                    userId: u.userId,
+                    nickname: u.nickname,
+                    createdAt: u.createdAt || '',
+                    lastLoginAt: u.lastLoginAt || '',
+                    wxOpenid: !!u.wxOpenid
+                }));
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, users: users }));
+            } catch (e) {
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, msg: e.message }));
+            }
+        });
+        return;
+    }
+
+    // 修改用户（昵称/密码，管理员操作）
+    if (req.url === '/api/monitor/user/update' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', async () => {
+            if (!monitorAuthCheck(body)) {
+                res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, msg: '管理员密码错误' }));
+                return;
+            }
+            try {
+                const data = JSON.parse(body || '{}');
+                const userId = String(data.userId || '').trim();
+                if (!userId) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '缺少用户ID' }));
+                    return;
+                }
+                await usersDb.read();
+                const users = usersDb.data.users || [];
+                const user = users.find(u => u.userId === userId);
+                if (!user) {
+                    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '用户不存在' }));
+                    return;
+                }
+                const changes = [];
+                // 修改昵称
+                if (data.nickname !== undefined && data.nickname !== null && String(data.nickname).trim() !== '') {
+                    const nn = String(data.nickname).trim();
+                    if (nn.length > 20) {
+                        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                        res.end(JSON.stringify({ success: false, msg: '昵称不能超过20字' }));
+                        return;
+                    }
+                    if (users.some(u => u.nickname === nn && u.userId !== userId)) {
+                        res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' });
+                        res.end(JSON.stringify({ success: false, msg: '该昵称已被其他用户占用' }));
+                        return;
+                    }
+                    user.nickname = nn;
+                    changes.push('昵称');
+                }
+                // 修改密码
+                if (data.password !== undefined && data.password !== null && String(data.password).trim() !== '') {
+                    const np = String(data.password).trim();
+                    if (np.length < 6 || np.length > 100) {
+                        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                        res.end(JSON.stringify({ success: false, msg: '新密码长度需为6-100位' }));
+                        return;
+                    }
+                    user.password = hashPassword(np);
+                    changes.push('密码');
+                }
+                if (changes.length === 0) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '未提供需要修改的字段' }));
+                    return;
+                }
+                await usersDb.write();
+                console.log(`管理员修改用户 ${userId}: ${changes.join('、')}`);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, msg: changes.join('、') + '修改成功' }));
+            } catch (e) {
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, msg: e.message }));
+            }
+        });
+        return;
+    }
+
+    // 重置用户（昵称=ID、密码=123456，管理员操作）
+    if (req.url === '/api/monitor/user/reset' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', async () => {
+            if (!monitorAuthCheck(body)) {
+                res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, msg: '管理员密码错误' }));
+                return;
+            }
+            try {
+                const data = JSON.parse(body || '{}');
+                const userId = String(data.userId || '').trim();
+                if (!userId) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '缺少用户ID' }));
+                    return;
+                }
+                await usersDb.read();
+                const user = (usersDb.data.users || []).find(u => u.userId === userId);
+                if (!user) {
+                    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '用户不存在' }));
+                    return;
+                }
+                user.nickname = userId;
+                user.password = hashPassword('123456');
+                await usersDb.write();
+                console.log(`管理员重置用户: ${userId}（昵称=ID、密码=123456）`);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, msg: '重置成功！昵称已改为' + userId + '，密码重置为123456' }));
+            } catch (e) {
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, msg: e.message }));
+            }
+        });
+        return;
+    }
+
+    // 删除用户（管理员操作）
+    if (req.url === '/api/monitor/user/delete' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', async () => {
+            if (!monitorAuthCheck(body)) {
+                res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, msg: '管理员密码错误' }));
+                return;
+            }
+            try {
+                const data = JSON.parse(body || '{}');
+                const userId = String(data.userId || '').trim();
+                if (!userId) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '缺少用户ID' }));
+                    return;
+                }
+                await usersDb.read();
+                const users = usersDb.data.users || [];
+                const index = users.findIndex(u => u.userId === userId);
+                if (index === -1) {
+                    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, msg: '用户不存在' }));
+                    return;
+                }
+                const removed = users.splice(index, 1);
+                usersDb.data.users = users;
+                await usersDb.write();
+                console.log(`管理员删除用户: ${userId} (${removed[0].nickname})`);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, msg: '用户 ' + userId + ' 已删除' }));
+            } catch (e) {
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, msg: e.message }));
+            }
+        });
+        return;
+    }
     
     if (req.url === '/api/monitor/game-state') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1953,6 +2145,7 @@ function generateMonitorPage() {
     html += '<button class="tab-btn active" id="tabPlayerBtn" data-tab="player">玩家数据</button>\n';
     html += '<button class="tab-btn" id="tabStatsBtn" data-tab="stats">统计数据</button>\n';
     html += '<button class="tab-btn" id="tabHistoryBtn" data-tab="history">历史结算</button>\n';
+    html += '<button class="tab-btn" id="tabUsersBtn" data-tab="users">用户管理</button>\n';
     html += '</div>\n';
     html += '</div>\n';
     html += '<div class="card-body tabbed-body expanded" id="dataCardBody">\n';
@@ -1964,6 +2157,9 @@ function generateMonitorPage() {
     html += '</div>\n';
     html += '<div class="tab-content" id="tabHistoryContent">\n';
     html += '<div id="settlementHistoryContainer" style="height:calc(100% - 10px); overflow-y:auto; padding:2px;"></div>\n';
+    html += '</div>\n';
+    html += '<div class="tab-content" id="tabUsersContent">\n';
+    html += '<div id="usersManageContainer" style="height:calc(100% - 10px); overflow-y:auto; padding:2px;"></div>\n';
     html += '</div>\n';
     html += '</div>\n';
     html += '</div>\n';
@@ -2131,6 +2327,121 @@ function generateMonitorPage() {
     html += '        xhr2.send();\n';
     html += '    };\n';
     html += '    xhr1.send();\n';
+    html += '}\n';
+
+    // ===== 用户管理（管理端）：删改重置，需管理员密码 =====
+    html += 'function usersManageRequest(url, payload, successMsg) {\n';
+    html += '    var xhr = new XMLHttpRequest();\n';
+    html += '    xhr.open("POST", API_BASE + url, true);\n';
+    html += '    xhr.setRequestHeader("Content-Type", "application/json");\n';
+    html += '    xhr.onreadystatechange = function() {\n';
+    html += '        if (xhr.readyState === 4) {\n';
+    html += '            if (xhr.status === 200) {\n';
+    html += '                try {\n';
+    html += '                    var data = JSON.parse(xhr.responseText);\n';
+    html += '                    if (data.success) { showMonitorAlert("成功", successMsg || "操作成功", function() { loadUsersList(); }); }\n';
+    html += '                    else { showMonitorAlert("失败", data.msg || "操作失败"); }\n';
+    html += '                } catch(e) { showMonitorAlert("失败", "响应解析错误"); }\n';
+    html += '            } else if (xhr.status === 401) { showMonitorAlert("失败", "管理员密码错误"); }\n';
+    html += '            else { showMonitorAlert("失败", "操作失败（错误码：" + xhr.status + "）"); }\n';
+    html += '        }\n';
+    html += '    };\n';
+    html += '    xhr.send(JSON.stringify(payload));\n';
+    html += '}\n';
+
+    html += '// 加载用户列表（需管理员密码）\n';
+    html += 'function loadUsersList() {\n';
+    html += '    showMonitorPrompt("管理员验证", "", function(pwd) {\n';
+    html += '        if (pwd === null || pwd === "") return;\n';
+    html += '        var xhr = new XMLHttpRequest();\n';
+    html += '        xhr.open("POST", API_BASE + "/api/monitor/users", true);\n';
+    html += '        xhr.setRequestHeader("Content-Type", "application/json");\n';
+    html += '        xhr.onreadystatechange = function() {\n';
+    html += '            if (xhr.readyState !== 4) return;\n';
+    html += '            var container = document.getElementById("usersManageContainer");\n';
+    html += '            if (!container) return;\n';
+    html += '            if (xhr.status === 401) { showMonitorAlert("失败", "管理员密码错误"); return; }\n';
+    html += '            if (xhr.status !== 200) { container.innerHTML = \'<div style="padding:14px;color:#ff6b6b;text-align:center;">加载失败（错误码：\' + xhr.status + \'）</div>\'; return; }\n';
+    html += '            var data = JSON.parse(xhr.responseText);\n';
+    html += '            if (!data.success) { container.innerHTML = \'<div style="padding:14px;color:#ff6b6b;text-align:center;">\' + (data.msg || "加载失败") + \'</div>\'; return; }\n';
+    html += '            var users = data.users || [];\n';
+    html += '            if (users.length === 0) { container.innerHTML = \'<div style="padding:14px;color:#888;text-align:center;">暂无注册用户</div>\'; return; }\n';
+    html += '            var html = \'<div style="padding:4px 2px;font-size:0.78rem;color:#888;margin-bottom:6px;">共 \' + users.length + \' 个用户</div>\';\n';
+    html += '            for (var i = 0; i < users.length; i++) {\n';
+    html += '                var u = users[i];\n';
+    html += '                var wxTag = u.wxOpenid ? \'<span style="background:rgba(76,201,240,0.15);color:#4cc9f0;font-size:0.68rem;padding:1px 6px;border-radius:6px;margin-left:6px;">微信</span>\' : \'\';\n';
+    html += '                html += \'<div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 12px;margin-bottom:8px;">\' +\n';
+    html += '                    \'<div style="display:flex;align-items:center;justify-content:space-between;">\' +\n';
+    html += '                    \'<div style="font-weight:700;color:#fff;font-size:0.92rem;">\' + (u.nickname || "—") + \' <span style="color:#4cc9f0;font-size:0.8rem;font-weight:600;">ID: \' + u.userId + \'</span>\' + wxTag + \'</div>\' +\n';
+    html += '                    \'<div style="display:flex;gap:6px;flex-wrap:wrap;">\' +\n';
+    html += '                    \'<button data-uid="\' + u.userId + \'" data-nick="\' + (u.nickname || "") + \'" class="um-btn um-edit" style="padding:4px 10px;border:none;border-radius:7px;background:rgba(76,201,240,0.15);color:#4cc9f0;font-size:0.75rem;cursor:pointer;">改名</button>\' +\n';
+    html += '                    \'<button data-uid="\' + u.userId + \'" class="um-btn um-pwd" style="padding:4px 10px;border:none;border-radius:7px;background:rgba(67,97,238,0.2);color:#8ea7ff;font-size:0.75rem;cursor:pointer;">改密</button>\' +\n';
+    html += '                    \'<button data-uid="\' + u.userId + \'" class="um-btn um-reset" style="padding:4px 10px;border:none;border-radius:7px;background:rgba(255,193,7,0.15);color:#ffc107;font-size:0.75rem;cursor:pointer;">重置</button>\' +\n';
+    html += '                    \'<button data-uid="\' + u.userId + \'" class="um-btn um-del" style="padding:4px 10px;border:none;border-radius:7px;background:rgba(255,107,107,0.15);color:#ff6b6b;font-size:0.75rem;cursor:pointer;">删除</button>\' +\n';
+    html += '                    \'</div></div>\' +\n';
+    html += '                    \'<div style="font-size:0.72rem;color:#777;margin-top:6px;">注册：\' + (u.createdAt || "—") + \' ｜ 最近登录：\' + (u.lastLoginAt || "—") + \'</div>\' +\n';
+    html += '                    \'</div>\';\n';
+    html += '            }\n';
+    html += '            container.innerHTML = html;\n';
+    html += '            // 绑定操作事件\n';
+    html += '            var btns = container.querySelectorAll(".um-btn");\n';
+    html += '            for (var k = 0; k < btns.length; k++) {\n';
+    html += '                (function(btn) {\n';
+    html += '                    btn.addEventListener("click", function(e) {\n';
+    html += '                        e.stopPropagation();\n';
+    html += '                        var uid = btn.getAttribute("data-uid");\n';
+    html += '                        if (btn.classList.contains("um-edit")) {\n';
+    html += '                            showMonitorPrompt("修改昵称", btn.getAttribute("data-nick") || "", function(nick) {\n';
+    html += '                                if (nick === null || nick.trim() === "") return;\n';
+    html += '                                showMonitorPrompt("管理员验证", "", function(pwd) {\n';
+    html += '                                    if (pwd === null || pwd === "") return;\n';
+    html += '                                    usersManageRequest("/api/monitor/user/update", { pwd: pwd, userId: uid, nickname: nick.trim() }, "昵称修改成功");\n';
+    html += '                                });\n';
+    html += '                            });\n';
+    html += '                        } else if (btn.classList.contains("um-pwd")) {\n';
+    html += '                            showMonitorPrompt("设置新密码", "", function(np) {\n';
+    html += '                                if (np === null || np === "") return;\n';
+    html += '                                showMonitorPrompt("管理员验证", "", function(pwd) {\n';
+    html += '                                    if (pwd === null || pwd === "") return;\n';
+    html += '                                    usersManageRequest("/api/monitor/user/update", { pwd: pwd, userId: uid, password: np }, "密码修改成功");\n';
+    html += '                                });\n';
+    html += '                            });\n';
+    html += '                        } else if (btn.classList.contains("um-reset")) {\n';
+    html += '                            showMonitorPrompt("管理员验证", "", function(pwd) {\n';
+    html += '                                if (pwd === null || pwd === "") return;\n';
+    html += '                                showMonitorConfirm("重置确认", "确定重置该用户？昵称将改为ID，密码重置为123456。", function() {\n';
+    html += '                                    usersManageRequest("/api/monitor/user/reset", { pwd: pwd, userId: uid }, "重置成功");\n';
+    html += '                                });\n';
+    html += '                            });\n';
+    html += '                        } else if (btn.classList.contains("um-del")) {\n';
+    html += '                            showMonitorPrompt("管理员验证", "", function(pwd) {\n';
+    html += '                                if (pwd === null || pwd === "") return;\n';
+    html += '                                showMonitorConfirm("删除确认", "确定删除该用户吗？此操作不可撤销！", function() {\n';
+    html += '                                    usersManageRequest("/api/monitor/user/delete", { pwd: pwd, userId: uid }, "用户已删除");\n';
+    html += '                                });\n';
+    html += '                            });\n';
+    html += '                        }\n';
+    html += '                    });\n';
+    html += '                })(btns[k]);\n';
+    html += '            }\n';
+    html += '        };\n';
+    html += '        xhr.send(JSON.stringify({ pwd: pwd }));\n';
+    html += '    });\n';
+    html += '}\n';
+    html += '// 用户管理tab被点击时加载\n';
+    html += 'var tabUsersBtn = document.getElementById("tabUsersBtn");\n';
+    html += 'if (tabUsersBtn) {\n';
+    html += '    tabUsersBtn.addEventListener("click", function() {\n';
+    html += '        setTimeout(function() {\n';
+    html += '            var c = document.getElementById("usersManageContainer");\n';
+    html += '            if (c && !c.getAttribute("data-loaded")) {\n';
+    html += '                c.setAttribute("data-loaded", "1");\n';
+    html += '                loadUsersList();\n';
+    html += '            } else if (c) {\n';
+    html += '                loadUsersList();\n';
+    html += '            }\n';
+    html += '        }, 50);\n';
+    html += '    });\n';
     html += '}\n';
 
     // calculateGameStats function
