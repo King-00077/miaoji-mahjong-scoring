@@ -1431,11 +1431,7 @@ function monitorHandler(req, res) {
         let body = '';
         req.on('data', chunk => body += chunk);
         req.on('end', async () => {
-            if (!monitorAuthCheck(body)) {
-                res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
-                res.end(JSON.stringify({ success: false, msg: '管理员密码错误' }));
-                return;
-            }
+            // 用户列表为只读查询，无需管理员密码；改名/改密/重置/删除等操作仍需密码
             try {
                 await usersDb.read();
                 const users = (usersDb.data.users || []).map(u => ({
@@ -2004,8 +2000,11 @@ function generateMonitorPage() {
     html += '.card-body::-webkit-scrollbar { width:4px; }\n';
     html += '.card-body::-webkit-scrollbar-track { background:rgba(255,255,255,0.05); border-radius:10px; }\n';
     html += '.card-body::-webkit-scrollbar-thumb { background:rgba(76,201,240,0.4); border-radius:10px; }\n';
-    html += '.tab-content { display:none; height:100%; }\n';
-    html += '.tab-content.active { display:flex; flex-direction:column; height:100%; }\n';
+    html += '.tab-swiper { display:flex; width:100%; height:100%; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; scroll-behavior:smooth; }\n';
+    html += '.tab-swiper::-webkit-scrollbar { display:none; }\n';
+    html += '.tab-swiper { scrollbar-width:none; -ms-overflow-style:none; }\n';
+    html += '.tab-content { display:block; flex:0 0 100%; width:100%; height:100%; overflow-y:auto; scroll-snap-align:start; -webkit-overflow-scrolling:touch; }\n';
+    html += '.tab-content.active { display:block; }\n';
     html += '.player-data-container { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; height:100%; width:100%; }\n';
     html += '.player-data { background:rgba(255,255,255,0.05); border-radius:10px; padding:10px 8px 6px; display:flex; flex-direction:column; justify-content:center; align-items:center; min-width:0; height:100%; }\n';
     html += '.player-avatar { width:40px; height:40px; border-radius:50%; margin-bottom:6px; display:flex; align-items:center; justify-content:center; font-size:1rem; color:white; position:relative; flex-shrink:0; }\n';
@@ -2041,7 +2040,8 @@ function generateMonitorPage() {
     html += '.tab-btn:hover { background:rgba(255,255,255,0.15); color:#fff; }\n';
     html += '.tab-btn.active { background:linear-gradient(90deg,#4361ee,#4cc9f0); color:#fff; }\n';
     html += '.tab-btn:focus, .tab-btn:active { outline:none; box-shadow:none; }\n';
-    html += '.tab-content { display:none; }\n';
+    html += '.tab-content { display:block; flex:0 0 100%; width:100%; height:100%; overflow-y:auto; scroll-snap-align:start; -webkit-overflow-scrolling:touch; }\n';
+    html += '.tab-content.active { display:block; }\n';
     html += '@keyframes fadeIn { from{opacity:0;transform:translateY(5px);} to{opacity:1;transform:translateY(0);} }\n';
     html += '.settlement-list-item { background:rgba(255,255,255,0.06); border-radius:10px; padding:10px 12px; margin-bottom:8px; cursor:pointer; transition:all 0.2s ease; border:1px solid rgba(255,255,255,0.1); }\n';
     html += '.settlement-list-item:hover { background:rgba(255,255,255,0.1); transform:translateX(3px); border-color:rgba(76,201,240,0.4); }\n';
@@ -2149,6 +2149,7 @@ function generateMonitorPage() {
     html += '</div>\n';
     html += '</div>\n';
     html += '<div class="card-body tabbed-body expanded" id="dataCardBody">\n';
+    html += '<div class="tab-swiper" id="dataTabSwiper">\n';
     html += '<div class="tab-content active" id="tabPlayerContent">\n';
     html += '<div class="player-data-container" id="playerDataContainer"></div>\n';
     html += '</div>\n';
@@ -2160,6 +2161,7 @@ function generateMonitorPage() {
     html += '</div>\n';
     html += '<div class="tab-content" id="tabUsersContent">\n';
     html += '<div id="usersManageContainer" style="height:calc(100% - 10px); overflow-y:auto; padding:2px;"></div>\n';
+    html += '</div>\n';
     html += '</div>\n';
     html += '</div>\n';
     html += '</div>\n';
@@ -2351,16 +2353,14 @@ function generateMonitorPage() {
 
     html += '// 加载用户列表（需管理员密码）\n';
     html += 'function loadUsersList() {\n';
-    html += '    showMonitorPrompt("管理员验证", "", function(pwd) {\n';
-    html += '        if (pwd === null || pwd === "") return;\n';
-    html += '        var xhr = new XMLHttpRequest();\n';
-    html += '        xhr.open("POST", API_BASE + "/api/monitor/users", true);\n';
-    html += '        xhr.setRequestHeader("Content-Type", "application/json");\n';
-    html += '        xhr.onreadystatechange = function() {\n';
-    html += '            if (xhr.readyState !== 4) return;\n';
-    html += '            var container = document.getElementById("usersManageContainer");\n';
-    html += '            if (!container) return;\n';
-    html += '            if (xhr.status === 401) { showMonitorAlert("失败", "管理员密码错误"); return; }\n';
+    html += '    var xhr = new XMLHttpRequest();\n';
+    html += '    xhr.open("POST", API_BASE + "/api/monitor/users", true);\n';
+    html += '    xhr.setRequestHeader("Content-Type", "application/json");\n';
+    html += '    xhr.onreadystatechange = function() {\n';
+    html += '        if (xhr.readyState !== 4) return;\n';
+    html += '        var container = document.getElementById("usersManageContainer");\n';
+    html += '        if (!container) return;\n';
+    html += '        if (xhr.status === 401) { showMonitorAlert("失败", "管理员密码错误"); return; }\n';
     html += '            if (xhr.status !== 200) { container.innerHTML = \'<div style="padding:14px;color:#ff6b6b;text-align:center;">加载失败（错误码：\' + xhr.status + \'）</div>\'; return; }\n';
     html += '            var data = JSON.parse(xhr.responseText);\n';
     html += '            if (!data.success) { container.innerHTML = \'<div style="padding:14px;color:#ff6b6b;text-align:center;">\' + (data.msg || "加载失败") + \'</div>\'; return; }\n';
@@ -2397,7 +2397,7 @@ function generateMonitorPage() {
     html += '                                    if (pwd === null || pwd === "") return;\n';
     html += '                                    usersManageRequest("/api/monitor/user/update", { pwd: pwd, userId: uid, nickname: nick.trim() }, "昵称修改成功");\n';
     html += '                                });\n';
-    html += '                            });\n';
+    html += '                            }, false);\n';
     html += '                        } else if (btn.classList.contains("um-pwd")) {\n';
     html += '                            showMonitorPrompt("设置新密码", "", function(np) {\n';
     html += '                                if (np === null || np === "") return;\n';
@@ -2425,24 +2425,9 @@ function generateMonitorPage() {
     html += '                })(btns[k]);\n';
     html += '            }\n';
     html += '        };\n';
-    html += '        xhr.send(JSON.stringify({ pwd: pwd }));\n';
-    html += '    });\n';
+    html += '        xhr.send(JSON.stringify({}));\n';
     html += '}\n';
-    html += '// 用户管理tab被点击时加载\n';
-    html += 'var tabUsersBtn = document.getElementById("tabUsersBtn");\n';
-    html += 'if (tabUsersBtn) {\n';
-    html += '    tabUsersBtn.addEventListener("click", function() {\n';
-    html += '        setTimeout(function() {\n';
-    html += '            var c = document.getElementById("usersManageContainer");\n';
-    html += '            if (c && !c.getAttribute("data-loaded")) {\n';
-    html += '                c.setAttribute("data-loaded", "1");\n';
-    html += '                loadUsersList();\n';
-    html += '            } else if (c) {\n';
-    html += '                loadUsersList();\n';
-    html += '            }\n';
-    html += '        }, 50);\n';
-    html += '    });\n';
-    html += '}\n';
+    html += '// 用户管理tab的加载已由 Tab switching 中的 syncTabActive 统一处理（点击按钮或滑动到该页都会加载）\n';
 
     // calculateGameStats function
     html += 'function calculateGameStats(players, history) {\n';
@@ -2671,14 +2656,14 @@ function generateSettlementHistoryJS() {
     js += '    bo.onclick = function() { m.remove(); if (onClose) onClose(); };\n';
     js += '    d.appendChild(bo); m.appendChild(d); document.body.appendChild(m);\n';
     js += '}\n';
-    js += 'function showMonitorPrompt(title, defVal, onOk) {\n';
+    js += 'function showMonitorPrompt(title, defVal, onOk, isPassword) {\n';
     js += '    var m = document.createElement("div");\n';
     js += '    m.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;";\n';
     js += '    var d = document.createElement("div");\n';
     js += '    d.style.cssText = "background:#1a1a2e;border-radius:14px;width:82%;max-width:340px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);";\n';
     js += '    d.innerHTML = "<div style=\'padding:16px;font-size:1rem;font-weight:600;color:#fff;text-align:center;border-bottom:1px solid rgba(255,255,255,0.1);\'>" + title + "</div>";\n';
     js += '    var inp = document.createElement("input");\n';
-    js += '    inp.type = "password"; inp.value = defVal || ""; inp.placeholder = "请输入";\n';
+    js += '    inp.type = (isPassword === false) ? "text" : "password"; inp.value = defVal || ""; inp.placeholder = "请输入";\n';
     js += '    inp.style.cssText = "width:80%;margin:16px 10%;padding:10px 12px;border:1.5px solid #333;border-radius:8px;background:#0f0f1a;color:#fff;font-size:0.9rem;outline:none;box-sizing:border-box;";\n';
     js += '    d.appendChild(inp);\n';
     js += '    var br = document.createElement("div");\n';
@@ -3490,22 +3475,48 @@ function generateSettlementHistoryJS() {
     html += '        })(cardTitleIds[i]);\n';
     html += '    }\n';
 
-    // Tab switching
+    // Tab switching（支持按钮点击 + 左右滑动，两者联动）
     html += '    var tabBtns = document.querySelectorAll(".tab-btn");\n';
+    html += '    var dataSwiper = document.getElementById("dataTabSwiper");\n';
+    html += '    function syncTabActive(tab) {\n';
+    html += '        var allBtns = document.querySelectorAll(".tab-btn");\n';
+    html += '        for (var j = 0; j < allBtns.length; j++) {\n';
+    html += '            if (allBtns[j].getAttribute("data-tab") === tab) allBtns[j].classList.add("active");\n';
+    html += '            else allBtns[j].classList.remove("active");\n';
+    html += '        }\n';
+    html += '        if (tab === "users") {\n';
+    html += '            var c = document.getElementById("usersManageContainer");\n';
+    html += '            if (c && typeof loadUsersList === "function") loadUsersList();\n';
+    html += '        }\n';
+    html += '    }\n';
     html += '    for (var i = 0; i < tabBtns.length; i++) {\n';
     html += '        (function(btn) {\n';
     html += '            btn.addEventListener("click", function(e) {\n';
     html += '                e.stopPropagation();\n';
     html += '                var tab = btn.getAttribute("data-tab");\n';
+    html += '                var idx = 0;\n';
     html += '                var allBtns = document.querySelectorAll(".tab-btn");\n';
-    html += '                for (var j = 0; j < allBtns.length; j++) allBtns[j].classList.remove("active");\n';
-    html += '                btn.classList.add("active");\n';
-    html += '                var allContent = document.querySelectorAll(".tab-content");\n';
-    html += '                for (var j = 0; j < allContent.length; j++) allContent[j].classList.remove("active");\n';
-    html += '                var targetContent = document.getElementById("tab" + tab.charAt(0).toUpperCase() + tab.slice(1) + "Content");\n';
-    html += '                if (targetContent) targetContent.classList.add("active");\n';
+    html += '                for (var j = 0; j < allBtns.length; j++) {\n';
+    html += '                    if (allBtns[j].getAttribute("data-tab") === tab) idx = j;\n';
+    html += '                }\n';
+    html += '                syncTabActive(tab);\n';
+    html += '                if (dataSwiper && dataSwiper.scrollTo) {\n';
+    html += '                    dataSwiper.scrollTo({ left: idx * dataSwiper.clientWidth, behavior: "smooth" });\n';
+    html += '                }\n';
     html += '            });\n';
     html += '        })(tabBtns[i]);\n';
+    html += '    }\n';
+    html += '    if (dataSwiper) {\n';
+    html += '        var swiperTimer = null;\n';
+    html += '        dataSwiper.addEventListener("scroll", function() {\n';
+    html += '            clearTimeout(swiperTimer);\n';
+    html += '            swiperTimer = setTimeout(function() {\n';
+    html += '                var idx = Math.round(dataSwiper.scrollLeft / dataSwiper.clientWidth);\n';
+    html += '                if (idx < 0) idx = 0;\n';
+    html += '                var allBtns = document.querySelectorAll(".tab-btn");\n';
+    html += '                if (allBtns[idx]) syncTabActive(allBtns[idx].getAttribute("data-tab"));\n';
+    html += '            }, 80);\n';
+    html += '        }, { passive: true });\n';
     html += '    }\n';
 
     // Clear data button
