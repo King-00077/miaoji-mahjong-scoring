@@ -9137,7 +9137,7 @@ body.guest-mode .manual-score-btn {
                 const color = isIncome ? '#ff6b6b' : isExpense ? '#51cf66' : 'white';
                 // 玩家名 + 昵称（昵称小字浅色，用/分隔）
                 const muzzleName = p.name || '未知';
-                const nickname = p.nickname || '';
+                const nickname = p.userNickname || p.nickname || '';
                 let nameHtml = `<span style="font-weight:500;">${muzzleName}</span>`;
                 if (nickname && nickname !== muzzleName) {
                     nameHtml += `<span style="opacity:0.7;font-size:0.85em;"> / ${nickname}</span>`;
@@ -10211,7 +10211,7 @@ body.guest-mode .manual-score-btn {
                         // 玩家名 + 昵称（昵称小字浅色，用/分隔）
                         var nameContainer = _ce('span', 'font-weight:600;color:#2c3e50;font-size:0.85rem;');
                         var muzzleName = p.name || '未知';
-                        var nickname = p.nickname || '';
+                        var nickname = p.userNickname || p.nickname || '';
                         var nameSpan = _ce('span', '', muzzleName);
                         nameContainer.appendChild(nameSpan);
                         if (nickname && nickname !== muzzleName) {
