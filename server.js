@@ -5569,15 +5569,14 @@ wss.on('connection', async function connection(ws, req) {
                         duration: null
                     }, ws);
                     
-                    // ===== 高光时刻检测与播报（七梁 / 收入大额 / 庄家自摸 / 连赢）=====
+                    // ===== 高光时刻检测与播报（七梁 / 六梁 / 连庄 / 连赢）=====
                     const recentRecords = gameState.history.filter(r => !r.isUndo && r.type !== 'manual' && r.type !== 'settlement' && r.type !== 'tableFee' && r.type !== 'extra_score_set' && r.type !== 'guest_bet_set');
                     const highlightMsgs = [];
                     
-                    // 0. 计算本局赢家收入（供七梁/大额高光使用）
+                    // 0. 计算本局赢家收入（供六梁/七梁高光使用）
                     const detailArr = newRecord.details || [];
                     const winnerPayment = (newRecord.playerPayments || []).find(pp => pp.id === winner.id);
                     const winnerIncome = winnerPayment ? -winnerPayment.amount : 0;
-                    const bigWinThreshold = (SCORING_CONFIG && SCORING_CONFIG.muzzleScore >= 2) ? 60 : 30;
                     
                     // 0.5 计算本局梁数（底分2，每个激活计分项+1：1项=三梁，2=四梁，3=五梁，4=六梁，5=七梁）
                     // 计分项 = 激活的嘴子项（七梁视为满5项）；自摸不计入梁数
@@ -5595,58 +5594,23 @@ wss.on('connection', async function connection(ws, req) {
                     const bankerName = banker ? banker.name : '庄家';
                     const winnerIsBanker = winner.id === bankerId;
                     
-                    // 1. 七梁/六梁牌型 + 庄家被炸（非庄家赢）播报
+                    // 1. 七梁牌型播报（准确判断：只有detailArr包含'七梁'才播报七梁）
                     if (detailArr.includes('七梁')) {
-                        if (!winnerIsBanker) {
-                            // 庄家被七梁炸下庄：专属词库（带庄家名+赢家名）
-                            highlightMsgs.push({
-                                type: 'highlight_bankerHit',
-                                text: pickHighlightPhrase('bankerHit', winner.name, winnerIncome, 7, false, bankerName),
-                                winnerName: winner.name
-                            });
-                        } else {
-                            highlightMsgs.push({
-                                type: 'highlight_qiliang',
-                                text: pickHighlightPhrase('qiliang', winner.name, winnerIncome),
-                                winnerName: winner.name
-                            });
-                        }
+                        highlightMsgs.push({
+                            type: 'highlight_qiliang',
+                            text: pickHighlightPhrase('qiliang', winner.name, winnerIncome),
+                            winnerName: winner.name
+                        });
                     } else if (liangCount === 6) {
-                        // 六梁：同样值得播报（庄家被炸则用下庄词库）
-                        if (!winnerIsBanker) {
-                            highlightMsgs.push({
-                                type: 'highlight_bankerHit',
-                                text: pickHighlightPhrase('bankerHit', winner.name, winnerIncome, 6, false, bankerName),
-                                winnerName: winner.name
-                            });
-                        } else {
-                            highlightMsgs.push({
-                                type: 'highlight_liang6',
-                                text: pickHighlightPhrase('liang6', winner.name, winnerIncome),
-                                winnerName: winner.name
-                            });
-                        }
-                    }
-                    
-                    // 2. 收入大额：本局赢家净收入超过阈值（13块模式30分，25块模式60分）
-                    if (winnerIncome >= bigWinThreshold) {
+                        // 2. 六梁牌型播报（准确判断：只有liangCount===6才播报六梁，不会把七梁误判为六梁）
                         highlightMsgs.push({
-                            type: 'highlight_bigwin',
-                            text: pickHighlightPhrase('bigwin', winner.name, winnerIncome),
+                            type: 'highlight_liang6',
+                            text: pickHighlightPhrase('liang6', winner.name, winnerIncome),
                             winnerName: winner.name
                         });
                     }
                     
-                    // 3. 庄家自摸
-                    if (winner.isBanker && newRecord.isSelfDrawn) {
-                        highlightMsgs.push({
-                            type: 'highlight_banker_zimo',
-                            text: pickHighlightPhrase('zimo', winner.name, 0),
-                            winnerName: winner.name
-                        });
-                    }
-                    
-                    // 4. 连赢状态（连续 2+ 局同一赢家）
+                    // 3. 三连胜以上播报（连续 3+ 局同一赢家）
                     if (recentRecords.length >= 2) {
                         const lastTwo = recentRecords.slice(-2);
                         if (lastTwo.length === 2 && lastTwo.every(r => r.winnerId === winnerId)) {
@@ -5658,12 +5622,34 @@ wss.on('connection', async function connection(ws, req) {
                                 }
                                 return cnt;
                             })();
-                            // 5连胜由 Penta kill 播报（不重复触发普通连胜词库）
-                            if (winStreakCount >= 3 && winStreakCount !== 5) {
+                            // 三连胜以上播报
+                            if (winStreakCount >= 3) {
                                 highlightMsgs.push({
                                     type: 'highlight_streak',
                                     text: pickHighlightPhrase('streak', winner.name, winStreakCount),
                                     winnerName: winner.name
+                                });
+                            }
+                        }
+                    }
+                    
+                    // 4. 三连庄以上播报（连续 3+ 局同一庄家）
+                    if (recentRecords.length >= 2) {
+                        const lastTwoBanker = recentRecords.slice(-2);
+                        if (lastTwoBanker.length === 2 && lastTwoBanker.every(r => r.bankerId === bankerId)) {
+                            const bankerStreakCount = (() => {
+                                let cnt = 0;
+                                for (let k = recentRecords.length - 1; k >= 0; k--) {
+                                    if (recentRecords[k].bankerId === bankerId) cnt++;
+                                    else break;
+                                }
+                                return cnt;
+                            })();
+                            if (bankerStreakCount >= 3) {
+                                highlightMsgs.push({
+                                    type: 'highlight_bankerStreak',
+                                    text: `${bankerName}已连庄${bankerStreakCount}局`,
+                                    winnerName: bankerName
                                 });
                             }
                         }
