@@ -5610,7 +5610,26 @@ wss.on('connection', async function connection(ws, req) {
                         });
                     }
                     
-                    // 3. 三连胜以上播报（连续 3+ 局同一赢家）
+                    // 3. 大额收入播报：本局赢家净收入超过阈值（13块模式30分，25块模式60分）
+                    const bigWinThreshold = (SCORING_CONFIG && SCORING_CONFIG.muzzleScore >= 2) ? 60 : 30;
+                    if (winnerIncome >= bigWinThreshold) {
+                        highlightMsgs.push({
+                            type: 'highlight_bigwin',
+                            text: pickHighlightPhrase('bigwin', winner.name, winnerIncome),
+                            winnerName: winner.name
+                        });
+                    }
+                    
+                    // 4. 庄家自摸播报
+                    if (winner.isBanker && newRecord.isSelfDrawn) {
+                        highlightMsgs.push({
+                            type: 'highlight_banker_zimo',
+                            text: pickHighlightPhrase('zimo', winner.name, 0),
+                            winnerName: winner.name
+                        });
+                    }
+                    
+                    // 5. 三连胜以上播报（连续 3+ 局同一赢家）
                     if (recentRecords.length >= 2) {
                         const lastTwo = recentRecords.slice(-2);
                         if (lastTwo.length === 2 && lastTwo.every(r => r.winnerId === winnerId)) {
@@ -5633,7 +5652,7 @@ wss.on('connection', async function connection(ws, req) {
                         }
                     }
                     
-                    // 4. 三连庄以上播报（连续 3+ 局同一庄家）
+                    // 6. 三连庄以上播报（连续 3+ 局同一庄家）
                     if (recentRecords.length >= 2) {
                         const lastTwoBanker = recentRecords.slice(-2);
                         if (lastTwoBanker.length === 2 && lastTwoBanker.every(r => r.bankerId === bankerId)) {
