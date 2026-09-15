@@ -9171,10 +9171,15 @@ body.guest-mode .manual-score-btn {
                 });
             }
 
-            // 第一层：结算时间 + 时长 + 总局数（同一行）
+            // 第一层：结算时间 + 时长 + 总局数 + 台费（同一行）
             let timeLine = settleTime;
             if (duration) timeLine += ' ｜ ' + duration;
             timeLine += ' ｜ ' + totalRounds + '局';
+            // 本场台费（有台费时显示）
+            const tableFee = settlement.totalTableFee || 0;
+            if (tableFee > 0) {
+                timeLine += ' ｜ 台费' + tableFee;
+            }
 
             // 第三层：结算备注（仅有备注时渲染，可点击编辑）
             let remarkHtml = '';
@@ -9237,15 +9242,19 @@ body.guest-mode .manual-score-btn {
                 // 计算总台费（所有历史对局中tableFee记录的总和）
                 var totalTableFee = 0;
                 (data.settlements || []).forEach(function(s) {
-                    (s.history || []).forEach(function(r) {
-                        if (r.type === 'tableFee' && r.amount) {
-                            totalTableFee += Math.abs(r.amount);
-                        }
-                    });
+                    if (s.totalTableFee) {
+                        totalTableFee += s.totalTableFee;
+                    } else {
+                        (s.history || []).forEach(function(r) {
+                            if (r.type === 'tableFee' && r.tableFee) {
+                                totalTableFee += r.tableFee;
+                            }
+                        });
+                    }
                 });
                 var feeLabel = document.getElementById('totalTableFeeLabel');
                 if (feeLabel) {
-                    feeLabel.textContent = '总台费：' + totalTableFee + '分';
+                    feeLabel.textContent = '总台费：' + totalTableFee;
                 }
 
                 container.innerHTML = '';
@@ -9378,15 +9387,20 @@ body.guest-mode .manual-score-btn {
                 .then(data => {
                     var totalTableFee = 0;
                     (data.settlements || []).forEach(function(s) {
-                        (s.history || []).forEach(function(r) {
-                            if (r.type === 'tableFee' && r.amount) {
-                                totalTableFee += Math.abs(r.amount);
-                            }
-                        });
+                        // 优先用顶层的totalTableFee字段，兼容旧数据从history中累加
+                        if (s.totalTableFee) {
+                            totalTableFee += s.totalTableFee;
+                        } else {
+                            (s.history || []).forEach(function(r) {
+                                if (r.type === 'tableFee' && r.tableFee) {
+                                    totalTableFee += r.tableFee;
+                                }
+                            });
+                        }
                     });
                     var feeLabel = document.getElementById('totalTableFeeLabel');
                     if (feeLabel) {
-                        feeLabel.textContent = '总台费：' + totalTableFee + '分';
+                        feeLabel.textContent = '总台费：' + totalTableFee;
                     }
                 })
                 .catch(e => console.warn('获取总台费失败:', e));
