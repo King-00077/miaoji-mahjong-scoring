@@ -9234,6 +9234,20 @@ body.guest-mode .manual-score-btn {
                     localStorage.setItem('local_settlements', JSON.stringify(toStore));
                 } catch(e) { console.error('同步结算数据到本地失败:', e); }
 
+                // 计算总台费（所有历史对局中tableFee记录的总和）
+                var totalTableFee = 0;
+                (data.settlements || []).forEach(function(s) {
+                    (s.history || []).forEach(function(r) {
+                        if (r.type === 'tableFee' && r.amount) {
+                            totalTableFee += Math.abs(r.amount);
+                        }
+                    });
+                });
+                var feeLabel = document.getElementById('totalTableFeeLabel');
+                if (feeLabel) {
+                    feeLabel.textContent = '总台费：' + totalTableFee + '分';
+                }
+
                 container.innerHTML = '';
                 var sortedOnline = data.settlements.slice().reverse();
                 var batchIdx = 0;
@@ -9420,7 +9434,7 @@ body.guest-mode .manual-score-btn {
 
             content.innerHTML = `
                 <div style="background:linear-gradient(90deg,#667eea,#764ba2);padding:16px 20px;color:white;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
-                    <h3 style="margin:0;font-size:1.15rem;"><i class="fas fa-history" style="margin-right:8px;"></i>历史结算记录</h3>
+                    <h3 style="margin:0;font-size:1.15rem;"><i class="fas fa-history" style="margin-right:8px;"></i>历史结算记录<span id="totalTableFeeLabel" style="font-size:0.75rem;opacity:0.7;margin-left:12px;font-weight:normal;"></span></h3>
                     <button id="closeOfflineHistory" style="background:rgba(255,255,255,0.2);border:none;color:white;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:1.2rem;">×</button>
                 </div>
                 <div id="offlineProfileCard" style="padding:12px 15px 0;flex-shrink:0;"></div>

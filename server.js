@@ -891,9 +891,19 @@ const scoreServer = http.createServer((req, res) => {
                     if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
                     return b.winRate - a.winRate;
                 });
-                // 附带两种维度的排名
-                const byScore = [...ranked].sort((a, b) => b.totalScore - a.totalScore);
-                const byRate = [...ranked].sort((a, b) => b.winRate - a.winRate);
+                // 附带两种维度的排名（与排序规则一致：有对局记录者在前，无对局者在后）
+                const byScore = [...ranked].sort((a, b) => {
+                    const aHas = a.sessions > 0 ? 1 : 0, bHas = b.sessions > 0 ? 1 : 0;
+                    if (aHas !== bHas) return bHas - aHas;
+                    if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+                    return b.winSessions - a.winSessions;
+                });
+                const byRate = [...ranked].sort((a, b) => {
+                    const aHas = a.sessions > 0 ? 1 : 0, bHas = b.sessions > 0 ? 1 : 0;
+                    if (aHas !== bHas) return bHas - aHas;
+                    if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+                    return b.totalScore - a.totalScore;
+                });
                 const scoreRankMap = {}, rateRankMap = {};
                 byScore.forEach((x, i) => scoreRankMap[x.userId] = i + 1);
                 byRate.forEach((x, i) => rateRankMap[x.userId] = i + 1);
@@ -2376,7 +2386,6 @@ function generateMonitorPage() {
     html += '                    \'<div style="display:flex;gap:6px;flex-wrap:wrap;">\' +\n';
     html += '                    \'<button data-uid="\' + u.userId + \'" data-nick="\' + (u.nickname || "") + \'" class="um-btn um-edit" style="padding:4px 10px;border:none;border-radius:7px;background:rgba(76,201,240,0.15);color:#4cc9f0;font-size:0.75rem;cursor:pointer;">改名</button>\' +\n';
     html += '                    \'<button data-uid="\' + u.userId + \'" class="um-btn um-pwd" style="padding:4px 10px;border:none;border-radius:7px;background:rgba(67,97,238,0.2);color:#8ea7ff;font-size:0.75rem;cursor:pointer;">改密</button>\' +\n';
-    html += '                    \'<button data-uid="\' + u.userId + \'" class="um-btn um-reset" style="padding:4px 10px;border:none;border-radius:7px;background:rgba(255,193,7,0.15);color:#ffc107;font-size:0.75rem;cursor:pointer;">重置</button>\' +\n';
     html += '                    \'<button data-uid="\' + u.userId + \'" class="um-btn um-del" style="padding:4px 10px;border:none;border-radius:7px;background:rgba(255,107,107,0.15);color:#ff6b6b;font-size:0.75rem;cursor:pointer;">删除</button>\' +\n';
     html += '                    \'</div></div>\' +\n';
     html += '                    \'<div style="font-size:0.72rem;color:#777;margin-top:6px;">注册：\' + (u.createdAt || "—") + \' ｜ 最近登录：\' + (u.lastLoginAt || "—") + \'</div>\' +\n';
@@ -2404,13 +2413,6 @@ function generateMonitorPage() {
     html += '                                showMonitorPrompt("管理员验证", "", function(pwd) {\n';
     html += '                                    if (pwd === null || pwd === "") return;\n';
     html += '                                    usersManageRequest("/api/monitor/user/update", { pwd: pwd, userId: uid, password: np }, "密码修改成功");\n';
-    html += '                                });\n';
-    html += '                            });\n';
-    html += '                        } else if (btn.classList.contains("um-reset")) {\n';
-    html += '                            showMonitorPrompt("管理员验证", "", function(pwd) {\n';
-    html += '                                if (pwd === null || pwd === "") return;\n';
-    html += '                                showMonitorConfirm("重置确认", "确定重置该用户？昵称将改为ID，密码重置为123456。", function() {\n';
-    html += '                                    usersManageRequest("/api/monitor/user/reset", { pwd: pwd, userId: uid }, "重置成功");\n';
     html += '                                });\n';
     html += '                            });\n';
     html += '                        } else if (btn.classList.contains("um-del")) {\n';
@@ -2826,7 +2828,7 @@ function generateSettlementHistoryJS() {
     js += '                    var p = s.players[j];\n';
     js += '                    var cls = p.score >= 0 ? "win" : "lose";\n';
     js += '                    var sign = p.score >= 0 ? "+" : "";\n';
-    js += '                    var display = p.nickname ? (p.name + " / " + p.nickname) : p.name;\n';
+    js += '                    var display = p.userNickname || p.nickname ? (p.name + " / " + (p.userNickname || p.nickname)) : p.name;\n';
     js += '                    html += \'<div class="settlement-list-score-item"><span class="settlement-list-score-name">\' + display + \'</span><span class="settlement-list-score-val \' + cls + \'">\' + sign + p.score + \'</span></div>\';\n';
     js += '                }\n';
     js += '                html += \'</div>\';\n';
