@@ -9371,6 +9371,26 @@ body.guest-mode .manual-score-btn {
         // 渲染离线历史结算数据（从localStorage读取）—— 分批渲染避免卡顿
         function renderOfflineSettlementHistory(container) {
             const settlements = getLocalSettlements();
+            
+            // 异步从服务器获取最新数据，统计总台费并更新显示
+            fetch('/api/settlement-history')
+                .then(r => r.json())
+                .then(data => {
+                    var totalTableFee = 0;
+                    (data.settlements || []).forEach(function(s) {
+                        (s.history || []).forEach(function(r) {
+                            if (r.type === 'tableFee' && r.amount) {
+                                totalTableFee += Math.abs(r.amount);
+                            }
+                        });
+                    });
+                    var feeLabel = document.getElementById('totalTableFeeLabel');
+                    if (feeLabel) {
+                        feeLabel.textContent = '总台费：' + totalTableFee + '分';
+                    }
+                })
+                .catch(e => console.warn('获取总台费失败:', e));
+            
             if (!settlements || settlements.length === 0) {
                 container.innerHTML = `
                     <div class="no-settlement-history" style="text-align:center;padding:40px 20px;color:#999;">
