@@ -9135,9 +9135,15 @@ body.guest-mode .manual-score-btn {
                 const isExpense = score < 0;
                 const sign = isIncome ? '+' : '';
                 const color = isIncome ? '#ff6b6b' : isExpense ? '#51cf66' : 'white';
-                const displayName = getSettlementDisplayName(p);
+                // 玩家名 + 昵称（昵称小字浅色，用/分隔）
+                const muzzleName = p.name || '未知';
+                const nickname = p.nickname || '';
+                let nameHtml = `<span style="font-weight:500;">${muzzleName}</span>`;
+                if (nickname && nickname !== muzzleName) {
+                    nameHtml += `<span style="opacity:0.7;font-size:0.85em;"> / ${nickname}</span>`;
+                }
                 return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:rgba(255,255,255,0.1);border-radius:6px;font-size:0.82rem;">
-                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%;">${displayName}</span>
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%;">${nameHtml}</span>
                     <span style="font-weight:700;color:${color};white-space:nowrap;">${sign}${score}</span>
                 </div>`;
             }).join('');
@@ -10202,7 +10208,17 @@ body.guest-mode .manual-score-btn {
                     stats.forEach(function(p) {
                         var card = _ce('div', 'background:#f8f9ff;border-radius:8px;padding:10px;margin-bottom:6px;border:1px solid #e6e9f4;');
                         var cardHead = _ce('div', 'display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;');
-                        cardHead.appendChild(_ce('span', 'font-weight:600;color:#2c3e50;font-size:0.85rem;', safeName(p)));
+                        // 玩家名 + 昵称（昵称小字浅色，用/分隔）
+                        var nameContainer = _ce('span', 'font-weight:600;color:#2c3e50;font-size:0.85rem;');
+                        var muzzleName = p.name || '未知';
+                        var nickname = p.nickname || '';
+                        var nameSpan = _ce('span', '', muzzleName);
+                        nameContainer.appendChild(nameSpan);
+                        if (nickname && nickname !== muzzleName) {
+                            var nickSpan = _ce('span', 'opacity:0.65;font-size:0.85em;font-weight:normal;', ' / ' + nickname);
+                            nameContainer.appendChild(nickSpan);
+                        }
+                        cardHead.appendChild(nameContainer);
                         var scoreColor = p.score >= 0 ? '#e74c3c' : '#27ae60';
                         cardHead.appendChild(_ce('span', 'font-weight:700;color:' + scoreColor + ';font-size:0.9rem;', (p.score >= 0 ? '+' : '') + p.score));
                         card.appendChild(cardHead);
@@ -12650,17 +12666,20 @@ body.guest-mode .manual-score-btn {
                 }
                 const s = data.stats;
                 const nick = data.user ? data.user.nickname : (userId + '（未注册）');
-                const scoreColor = s.totalScore > 0 ? '#2e7d32' : (s.totalScore < 0 ? '#c62828' : '#666');
+                const scoreColor = s.totalScore > 0 ? '#c62828' : (s.totalScore < 0 ? '#2e7d32' : '#666');
+                // 场次胜率：赢的场次 / 总场次 × 100%
+                const totalSessions = (s.winSessions || 0) + (s.loseSessions || 0);
+                const sessionWinRate = totalSessions > 0 ? Math.round((s.winSessions || 0) / totalSessions * 100) : 0;
                 summaryEl.innerHTML = `
                     <div style="background:linear-gradient(135deg,#667eea22,#764ba222); border:1px solid #667eea44; border-radius:12px; padding:16px;">
                         <div style="font-size:1.05rem; font-weight:bold; color:#333; margin-bottom:4px;"><i class="fas fa-user-circle" style="color:#667eea;"></i> ${nick} <span style="font-size:0.75rem; color:#999; font-weight:normal;">(${s.userId})</span></div>
                         <div style="display:flex; justify-content:space-between; margin-top:10px; text-align:center;">
-                            <div style="flex:1;"><div style="font-size:1.5rem; font-weight:bold; color:#f5a623;">${s.roundWinRate}%</div><div style="font-size:0.72rem; color:#888;">总胜率</div></div>
+                            <div style="flex:1;"><div style="font-size:1.5rem; font-weight:bold; color:#f5a623;">${sessionWinRate}%</div><div style="font-size:0.72rem; color:#888;">胜率</div></div>
                             <div style="flex:1;"><div style="font-size:1.5rem; font-weight:bold; color:#333;">${s.totalRounds}</div><div style="font-size:0.72rem; color:#888;">总局数</div></div>
-                            <div style="flex:1;"><div style="font-size:1.5rem; font-weight:bold; color:#2e7d32;">${s.winRounds}</div><div style="font-size:0.72rem; color:#888;">胜局</div></div>
+                            <div style="flex:1;"><div style="font-size:1.5rem; font-weight:bold; color:#c62828;">${s.winSessions}</div><div style="font-size:0.72rem; color:#888;">胜场</div></div>
                             <div style="flex:1;"><div style="font-size:1.5rem; font-weight:bold; color:${scoreColor};">${s.totalScore > 0 ? '+' : ''}${s.totalScore}</div><div style="font-size:0.72rem; color:#888;">累计得分</div></div>
                         </div>
-                        <div style="margin-top:10px; font-size:0.78rem; color:#888; text-align:center;">参与 ${s.sessions} 场对局 · 赢 ${s.winSessions} 场（场次胜率 ${s.sessionWinRate}%）</div>
+                        <div style="margin-top:10px; font-size:0.78rem; color:#888; text-align:center;">参与 ${s.sessions} 场对局 · 赢 ${s.winSessions} 场（场次胜率 ${sessionWinRate}%）</div>
                     </div>`;
 
                 if (!s.details || s.details.length === 0) {
@@ -12732,8 +12751,11 @@ body.guest-mode .manual-score-btn {
                         if (mine) myRankCache = { rankByScore: mine.rankByScore, rankByWinRate: mine.rankByWinRate, total: lbData.list.length };
                     }
                 } catch (e) {}
-                const scoreColor = s.totalScore > 0 ? '#2e7d32' : (s.totalScore < 0 ? '#c62828' : '#666');
+                const scoreColor = s.totalScore > 0 ? '#c62828' : (s.totalScore < 0 ? '#2e7d32' : '#666');
                 const rankText = myRankCache.rankByScore ? ('第 ' + myRankCache.rankByScore + ' 名') : '暂无排名';
+                // 场次胜率：赢的场次 / 总场次 × 100%
+                const totalSessions = (s.winSessions || 0) + (s.loseSessions || 0);
+                const sessionWinRate = totalSessions > 0 ? Math.round((s.winSessions || 0) / totalSessions * 100) : 0;
                 card.innerHTML = `
                 <div style="background:linear-gradient(135deg,#667eea18,#764ba218); border:1px solid #667eea33; border-radius:14px; padding:14px;">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
@@ -12749,9 +12771,9 @@ body.guest-mode .manual-score-btn {
                         </div>
                     </div>
                     <div style="display:flex; justify-content:space-between; text-align:center; margin-top:12px; padding-top:10px; border-top:1px dashed #ccc;">
-                        <div style="flex:1;"><div style="font-weight:bold; color:#2e7d32; font-size:1rem;">赢 ${s.winSessions}</div><div style="font-size:0.7rem; color:#888;">次</div></div>
-                        <div style="flex:1;"><div style="font-weight:bold; color:#c62828; font-size:1rem;">输 ${s.loseSessions}</div><div style="font-size:0.7rem; color:#888;">次</div></div>
-                        <div style="flex:1;"><div style="font-weight:bold; color:#f5a623; font-size:1rem;">${s.roundWinRate}%</div><div style="font-size:0.7rem; color:#888;">胜率</div></div>
+                        <div style="flex:1;"><div style="font-weight:bold; color:#c62828; font-size:1rem;">赢 ${s.winSessions}</div><div style="font-size:0.7rem; color:#888;">次</div></div>
+                        <div style="flex:1;"><div style="font-weight:bold; color:#2e7d32; font-size:1rem;">输 ${s.loseSessions}</div><div style="font-size:0.7rem; color:#888;">次</div></div>
+                        <div style="flex:1;"><div style="font-weight:bold; color:#f5a623; font-size:1rem;">${sessionWinRate}%</div><div style="font-size:0.7rem; color:#888;">胜率</div></div>
                         <div style="flex:1; cursor:pointer;" class="my-rank-click">
                             <div style="font-weight:bold; color:#667eea; font-size:1rem; text-decoration:underline;">${rankText}</div>
                             <div style="font-size:0.7rem; color:#888;">排名 ▸</div>
@@ -12804,7 +12826,10 @@ body.guest-mode .manual-score-btn {
                 list.forEach((x, i) => {
                     const isMe = me && x.userId === me.userId;
                     const medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : (i + 1)));
-                    const scoreColor = x.totalScore > 0 ? '#2e7d32' : (x.totalScore < 0 ? '#c62828' : '#666');
+                    const scoreColor = x.totalScore > 0 ? '#c62828' : (x.totalScore < 0 ? '#2e7d32' : '#666');
+                    // 场次胜率：赢的场次 / 总场次 × 100%（按结算场次统计，而非局数）
+                    const totalSessions = (x.winSessions || 0) + (x.loseSessions || 0);
+                    const sessionWinRate = totalSessions > 0 ? Math.round((x.winSessions || 0) / totalSessions * 100) : 0;
                     html += `
                     <div style="display:flex; align-items:center; justify-content:space-between; padding:11px 12px; margin-bottom:8px; border-radius:10px; border:1px solid ${isMe ? '#667eea' : '#eee'}; background:${isMe ? '#f5f7ff' : '#fff'};">
                         <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
@@ -12816,7 +12841,7 @@ body.guest-mode .manual-score-btn {
                         </div>
                         <div style="text-align:right;">
                             <div style="font-weight:bold; color:${scoreColor}; font-size:1rem;">${x.totalScore > 0 ? '+' : ''}${x.totalScore}</div>
-                            <div class="lb-winrate-click" data-uid="${x.userId}" data-nick="${escapeHtmlLocal(x.nickname)}" style="font-size:0.78rem; color:#f5a623; cursor:pointer; text-decoration:underline;">${x.winRate}%</div>
+                            <div class="lb-winrate-click" data-uid="${x.userId}" data-nick="${escapeHtmlLocal(x.nickname)}" style="font-size:0.78rem; color:#f5a623; cursor:pointer; text-decoration:underline;">${sessionWinRate}%</div>
                         </div>
                     </div>`;
                 });
