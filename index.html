@@ -8436,7 +8436,7 @@ body.guest-mode .manual-score-btn {
                 const durationMs = settleTime - startTs;
                 const durationHours = Math.floor(durationMs / 3600000);
                 const durationMinutes = Math.floor((durationMs % 3600000) / 60000);
-                const durationStr = durationHours + '小时' + durationMinutes + '分钟';
+                const durationStr = durationHours + 'h' + durationMinutes + 'm';
                 const startTimeStr = new Date(startTs).toLocaleString('zh-CN', { hour12: false });
 
                 const settlementRecord = {
@@ -9115,7 +9115,7 @@ body.guest-mode .manual-score-btn {
             const durationMs = endMs - startMs;
             const hours = Math.floor(durationMs / 3600000);
             const minutes = Math.floor((durationMs % 3600000) / 60000);
-            return hours + '小时' + minutes + '分钟';
+            return hours + 'h' + minutes + 'm';
         }
 
         // 生成三层布局的历史结算卡片HTML（前端历史页、离线历史页共用）
