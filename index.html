@@ -9591,8 +9591,8 @@ body.guest-mode .manual-score-btn {
                 if (creditor.score <= 0) break;
                 var amount = Math.min(-debtor.score, creditor.score);
                 if (amount > 0) {
-                    var fromName = debtor._isGuest ? ('游客 ' + debtor.name) : (debtor.name + (debtor.nickname ? ' / ' + debtor.nickname : ''));
-                    var toName = creditor._isGuest ? ('游客 ' + creditor.name) : (creditor.name + (creditor.nickname ? ' / ' + creditor.nickname : ''));
+                    var fromName = debtor._isGuest ? ('游客 ' + (debtor.name || '')) : (debtor.name || '');
+                    var toName = creditor._isGuest ? ('游客 ' + (creditor.name || '')) : (creditor.name || '');
                     payments.push({ from: fromName, to: toName, amount: Math.round(amount) });
                 }
                 debtor.score += amount;
@@ -9607,8 +9607,7 @@ body.guest-mode .manual-score-btn {
                     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
             }
             return payments.map(function(p) {
-                return '<div style="display:flex;justify-content:space-between;gap:6px;padding:2px 0;font-size:0.72rem;color:#555;border-bottom:1px dashed #eee;">' +
-                    '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escS(p.from) + ' 支付 ' + p.amount + ' 给 ' + escS(p.to) + '</span></div>';
+                return '<div style="padding:1px 0;">' + escS(p.from) + ' 支付 ' + p.amount + ' 给 ' + escS(p.to) + '</div>';
             }).join('');
         }
 
@@ -10304,17 +10303,17 @@ body.guest-mode .manual-score-btn {
                 if (tfTotal > 0) infoLine2 += ' | 总台费: ' + tfTotal;
                 leftInfo.appendChild(_ce('div', '', infoLine2));
                 infoDiv.appendChild(leftInfo);
-                // 支付建议（按含台费的账面分 score 计算，台费归发起者，实际清账需含台费）
-                var payWrap = _ce('div', 'flex:0 0 auto;max-width:50%;min-width:150px;background:#fff8ec;border:1px solid #f5d9a8;border-radius:6px;padding:5px 8px;');
-                payWrap.appendChild(_ce('div', 'font-weight:600;color:#b8860b;font-size:0.72rem;margin-bottom:2px;', '支付建议（含台费）'));
+                // 支付建议（按含台费的账面分 score 计算，纯文字排版与左侧时间信息一致）
+                var payWrap = _ce('div', 'flex:0 0 auto;max-width:50%;min-width:150px;');
+                payWrap.appendChild(_ce('div', 'font-weight:600;margin-bottom:2px;', '支付建议'));
                 var payHtml = '';
                 try { payHtml = buildSettlementPaymentHtml(settlement); } catch(e) { payHtml = ''; }
                 if (payHtml) {
-                    var payBody = _ce('div', 'line-height:1.5;');
+                    var payBody = _ce('div', 'line-height:1.6;');
                     payBody.innerHTML = payHtml;
                     payWrap.appendChild(payBody);
                 } else {
-                    payWrap.appendChild(_ce('div', 'color:#999;font-size:0.72rem;', '无需支付'));
+                    payWrap.appendChild(_ce('div', '', '无需支付'));
                 }
                 infoDiv.appendChild(payWrap);
                 overviewPanel.appendChild(infoDiv);
