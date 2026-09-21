@@ -3665,7 +3665,7 @@ body.guest-mode .manual-score-btn {
                             <i class="fas fa-hand-holding-usd"></i> 划扣
                         </button>
                     </div>
-                    <div style="font-size: 0.75rem; color: #888; margin-top: 4px;">输入金额后点击"划扣"，台费将平均从每位玩家扣除并汇总给您</div>
+                    <div style="font-size: 0.75rem; color: #888; margin-top: 4px;">输入金额后点击"划扣"，台费将平均从每位玩家扣除（台费为场地费用，不归属任何玩家）</div>
                 </div>
             </div>
             <div class="settlement-actions">
@@ -8363,11 +8363,8 @@ body.guest-mode .manual-score-btn {
                 appState.players.forEach((player, idx) => {
                     let deduction = feePerPlayer;
                     if (idx < remainder) deduction += 1;
-                    if (player.muzzleType === initiatorMuzzle) {
-                        player.score = player.score - deduction + tableFee;
-                    } else {
-                        player.score = player.score - deduction;
-                    }
+                    // 台费为场地费用：所有玩家（含发起者）统一扣除，不汇总给发起者
+                    player.score = player.score - deduction;
                 });
 
                 showNotification(`${initiatorName}发起台费扣除，总金额 ${tableFee} 元，每人扣除 ${feePerPlayer} 元`, 'info', 8000);
@@ -8411,12 +8408,25 @@ body.guest-mode .manual-score-btn {
         // 保存结算数据到本地localStorage
         function saveSettlementToLocal() {
             try {
-                const players = appState.players.map(p => ({
-                    name: p.name,
-                    nickname: p.nickname || '',
-                    muzzleType: p.muzzleType,
-                    score: p.score
-                }));
+                // 计算每位玩家的台费净收支（台费为场地费用，全员支出，不归属发起者）
+                const tfRecs = appState.history.filter(r => r.type === 'tableFee' && !r.isUndo);
+                const players = appState.players.map(p => {
+                    let tfNet = 0;
+                    for (const tf of tfRecs) {
+                        const me = (tf.players || []).find(x => x && x.muzzleType === p.muzzleType);
+                        if (me) tfNet += (me.netChange !== undefined ? me.netChange : -(me.deduction || 0));
+                    }
+                    tfNet = Math.round(tfNet);
+                    const score = p.score;
+                    return {
+                        name: p.name,
+                        nickname: p.nickname || '',
+                        muzzleType: p.muzzleType,
+                        score: score,
+                        tableFeeNet: tfNet,
+                        gameScore: Math.round(score - tfNet) // 纯对局分（不含台费，用于胜率判定）
+                    };
+                });
                 const extraScoreRecords = [];
                 const extraScoreHistory = [];
                 appState.players.forEach(p => {
@@ -8851,7 +8861,8 @@ body.guest-mode .manual-score-btn {
                         const tfName = p.name || (tfP ? tfP.name : '未知');
                         const tfDeduction = p.deduction !== undefined ? p.deduction : (record.feePerPlayer || 0);
                         const tfIsInit = p.isInitiator !== undefined ? p.isInitiator : (p.muzzleType === record.initiatorMuzzle);
-                        const tfNet = p.netChange !== undefined ? p.netChange : (tfIsInit ? ((record.tableFee || 0) - tfDeduction) : (-tfDeduction));
+                        // 台费为场地费用：所有玩家均为支出，netChange 缺失时一律按 -deduction
+                        const tfNet = p.netChange !== undefined ? p.netChange : (-tfDeduction);
                         const tfColor = tfNet > 0 ? '#e67e22' : (tfNet < 0 ? '#27ae60' : '#888');
                         const tfSign = tfNet > 0 ? '+' : (tfNet < 0 ? '-' : '');
                         const tfLabel = tfIsInit ? (tfName + '（发起人）') : tfName;
@@ -10390,11 +10401,12 @@ body.guest-mode .manual-score-btn {
                                     var tfName2 = tfp.name || getPlayerName(tfp.id);
                                     var tfDed2 = (tfp.deduction !== undefined) ? tfp.deduction : (tfRec.feePerPlayer || 0);
                                     var tfIs2 = (tfp.isInitiator !== undefined) ? tfp.isInitiator : (tfp.muzzleType === tfRec.initiatorMuzzle);
-                                    var tfNet2 = (tfp.netChange !== undefined) ? tfp.netChange : (tfIs2 ? ((tfRec.tableFee || 0) - tfDed2) : (-tfDed2));
+                                    // 台费为场地费用：所有玩家均为支出，netChange 缺失时一律按 -deduction
+                                    var tfNet2 = (tfp.netChange !== undefined) ? tfp.netChange : (-tfDed2);
                                     var tfCol2 = tfNet2 > 0 ? '#e67e22' : (tfNet2 < 0 ? '#27ae60' : '#888');
                                     var tfSig2 = tfNet2 > 0 ? '+' : (tfNet2 < 0 ? '-' : '');
                                     var row2 = _ce('div', 'display:flex;justify-content:space-between;padding:2px 0 2px 12px;font-size:0.68rem;color:#8a6d3b;');
-                                    row2.appendChild(_ce('span', '', tfIs2 ? (tfName2 + '（发起人，收入）') : (tfName2 + '（支出）')));
+                                    row2.appendChild(_ce('span', '', tfIs2 ? (tfName2 + '（发起人，支出）') : (tfName2 + '（支出）')));
                                     row2.appendChild(_ce('span', 'color:' + tfCol2 + ';font-weight:600;', tfSig2 + Math.abs(tfNet2)));
                                     tfDiv.appendChild(row2);
                                 });
@@ -10460,7 +10472,8 @@ body.guest-mode .manual-score-btn {
                                 var tfName = tfp.name || getPlayerName(tfp.id);
                                 var tfDeduction = (tfp.deduction !== undefined) ? tfp.deduction : (r.feePerPlayer || 0);
                                 var tfIsInit = (tfp.isInitiator !== undefined) ? tfp.isInitiator : (tfp.muzzleType === r.initiatorMuzzle);
-                                var tfNet = (tfp.netChange !== undefined) ? tfp.netChange : (tfIsInit ? ((r.tableFee || 0) - tfDeduction) : (-tfDeduction));
+                                // 台费为场地费用：所有玩家均为支出，netChange 缺失时一律按 -deduction
+                                var tfNet = (tfp.netChange !== undefined) ? tfp.netChange : (-tfDeduction);
                                 var tfColor = tfNet > 0 ? '#e67e22' : (tfNet < 0 ? '#27ae60' : '#888');
                                 var tfSign = tfNet > 0 ? '+' : (tfNet < 0 ? '-' : '');
                                 var tfLabel = tfIsInit ? (tfName + '（发起人）') : tfName;
@@ -12917,8 +12930,9 @@ body.guest-mode .manual-score-btn {
                 const data = await resp.json();
                 if (!data.success) { content.innerHTML = '<div style="text-align:center;padding:20px;color:#c62828;">加载失败</div>'; return; }
                 const details = (data.stats && data.stats.details) || [];
-                const wins = details.filter(d => d.score > 0);
-                const losses = details.filter(d => d.score <= 0);
+                // 胜负判定用纯对局分 gameScore（台费收支不参与），缺失时回退 score
+                const wins = details.filter(d => (d.gameScore !== undefined && d.gameScore !== null ? d.gameScore : d.score) > 0);
+                const losses = details.filter(d => (d.gameScore !== undefined && d.gameScore !== null ? d.gameScore : d.score) <= 0);
                 let html = `<div style="display:flex; gap:10px; margin-bottom:14px;">
                     <div style="flex:1; background:#e8f5e9; border-radius:10px; padding:12px; text-align:center;">
                         <div style="font-size:1.4rem; font-weight:bold; color:#2e7d32;">${wins.length}</div>
@@ -12932,18 +12946,20 @@ body.guest-mode .manual-score-btn {
                 if (wins.length > 0) {
                     html += '<div style="font-size:0.85rem; font-weight:bold; color:#2e7d32; margin:10px 0 6px;"><i class="fas fa-arrow-up"></i> 胜场明细</div>';
                     wins.forEach(d => {
+                        const gs = (d.gameScore !== undefined && d.gameScore !== null) ? d.gameScore : d.score;
                         html += `<div style="display:flex; justify-content:space-between; padding:8px 11px; border-left:3px solid #2e7d32; background:#f6fbf7; border-radius:6px; margin-bottom:6px; font-size:0.82rem;">
                             <div><div style="color:#333;">${d.timestamp}</div><div style="color:#999; font-size:0.72rem;">${d.totalRounds}局 胜${d.winRounds} · ${d.duration}</div></div>
-                            <div style="font-weight:bold; color:#2e7d32;">+${d.score}</div>
+                            <div style="font-weight:bold; color:#2e7d32;">+${gs}</div>
                         </div>`;
                     });
                 }
                 if (losses.length > 0) {
                     html += '<div style="font-size:0.85rem; font-weight:bold; color:#c62828; margin:14px 0 6px;"><i class="fas fa-arrow-down"></i> 败场明细</div>';
                     losses.forEach(d => {
+                        const gs = (d.gameScore !== undefined && d.gameScore !== null) ? d.gameScore : d.score;
                         html += `<div style="display:flex; justify-content:space-between; padding:8px 11px; border-left:3px solid #c62828; background:#fdf6f5; border-radius:6px; margin-bottom:6px; font-size:0.82rem;">
                             <div><div style="color:#333;">${d.timestamp}</div><div style="color:#999; font-size:0.72rem;">${d.totalRounds}局 胜${d.winRounds} · ${d.duration}</div></div>
-                            <div style="font-weight:bold; color:#c62828;">${d.score}</div>
+                            <div style="font-weight:bold; color:#c62828;">${gs}</div>
                         </div>`;
                     });
                 }

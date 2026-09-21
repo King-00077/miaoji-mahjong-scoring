@@ -470,7 +470,14 @@ const scoreServer = http.createServer((req, res) => {
             sessions++;
             const score = me.score || 0;
             totalScore += score;
-            if (score > 0) winSessions++;
+            // 纯对局分（不含台费）：优先读结算时已存储的 gameScore，缺失时反推 score - tableFeeNet
+            // 胜负判定只看纯对局分，台费收支不参与胜率统计
+            let gameScore = me.gameScore;
+            if (gameScore === undefined || gameScore === null) {
+                const tfNet = (me.tableFeeNet !== undefined && me.tableFeeNet !== null) ? me.tableFeeNet : 0;
+                gameScore = score - tfNet;
+            }
+            if (gameScore > 0) winSessions++;
             // history 中的 winnerId 为 1-based 玩家编号，对应 players 中 id 字段（缺省用下标+1）
             const myId = (me.id != null) ? me.id : (myIndex + 1);
             const rounds = (s.history || []);
@@ -484,6 +491,7 @@ const scoreServer = http.createServer((req, res) => {
                 duration: s.duration || '',
                 muzzleType: me.muzzleType,
                 score: score,
+                gameScore: gameScore, // 纯对局分（不含台费），用于胜负场次判定
                 totalRounds: rTotal,
                 winRounds: rWin,
                 remark: s.remark || ''
@@ -492,7 +500,7 @@ const scoreServer = http.createServer((req, res) => {
         return {
             userId,
             sessions, winSessions, totalRounds, winRounds, totalScore,
-            // 场次维度：赢 = 该场结算分数>0；输 = 分数<=0
+            // 场次维度：赢 = 该场纯对局分>0（台费收支不参与胜负判定）；输 = 纯对局分<=0
             loseSessions: sessions - winSessions,
             roundWinRate: totalRounds > 0 ? +(winRounds / totalRounds * 100).toFixed(1) : 0,
             sessionWinRate: sessions > 0 ? +(winSessions / sessions * 100).toFixed(1) : 0,
@@ -3011,10 +3019,11 @@ function generateSettlementHistoryJS() {
     js += '                var tfp2 = tfPlist[tfi4];\n';
     js += '                var tfName2 = tfp2.name || "未知";\n';
     js += '                var tfIs2 = (tfp2.isInitiator !== undefined) ? tfp2.isInitiator : (tfp2.muzzleType === tfRec.initiatorMuzzle);\n';
-    js += '                var tfNet2 = (tfp2.netChange !== undefined) ? tfp2.netChange : (tfIs2 ? ((tfRec.tableFee||0) - (tfp2.deduction||0)) : -(tfp2.deduction||0));\n';
+    js += '                // 台费为场地费用：所有玩家均为支出，netChange 缺失时一律按 -deduction\n';
+    js += '                var tfNet2 = (tfp2.netChange !== undefined) ? tfp2.netChange : -(tfp2.deduction||0);\n';
     js += '                var tfCol2 = tfNet2 > 0 ? "#ffd43b" : (tfNet2 < 0 ? "#ff6b6b" : "#888");\n';
     js += '                var tfSig2 = tfNet2 > 0 ? "+" : (tfNet2 < 0 ? "-" : "");\n';
-    js += '                overviewHtml += \'<div style="display:flex;justify-content:space-between;padding:2px 0 2px 12px;font-size:0.7rem;color:#aaa;"><span>\' + (tfIs2 ? (tfName2 + "（发起人，收入）") : (tfName2 + "（支出）")) + \'</span><span style="color:\' + tfCol2 + \';font-weight:600;">\' + tfSig2 + Math.abs(tfNet2) + \'</span></div>\';\n';
+    js += '                overviewHtml += \'<div style="display:flex;justify-content:space-between;padding:2px 0 2px 12px;font-size:0.7rem;color:#aaa;"><span>\' + (tfIs2 ? (tfName2 + "（发起人，支出）") : (tfName2 + "（支出）")) + \'</span><span style="color:\' + tfCol2 + \';font-weight:600;">\' + tfSig2 + Math.abs(tfNet2) + \'</span></div>\';\n';
     js += '            }\n';
     js += '            overviewHtml += \'</div>\';\n';
     js += '        }\n';
@@ -3052,7 +3061,8 @@ function generateSettlementHistoryJS() {
     js += '                    var tfName = tfp.name || "未知";\n';
     js += '                    var tfDeduction = (tfp.deduction !== undefined) ? tfp.deduction : (rec.feePerPlayer || 0);\n';
     js += '                    var tfIsInit = (tfp.isInitiator !== undefined) ? tfp.isInitiator : (tfp.muzzleType === rec.initiatorMuzzle);\n';
-    js += '                    var tfNet = (tfp.netChange !== undefined) ? tfp.netChange : (tfIsInit ? ((rec.tableFee || 0) - tfDeduction) : (-tfDeduction));\n';
+    js += '                    // 台费为场地费用：所有玩家均为支出，netChange 缺失时一律按 -deduction\n';
+    js += '                    var tfNet = (tfp.netChange !== undefined) ? tfp.netChange : (-tfDeduction);\n';
     js += '                    var tfCls = tfNet > 0 ? "win" : (tfNet < 0 ? "lose" : "");\n';
     js += '                    var tfSign = tfNet > 0 ? "+" : (tfNet < 0 ? "-" : "");\n';
     js += '                    var tfLabel = tfIsInit ? (tfName + "（发起人）") : tfName;\n';
@@ -3649,7 +3659,7 @@ let pendingSettlementRemark = '';
 // 游客下注窗口截止时间（每局计分后刷新 20 秒）；模块级避免对局重建丢失
 let guestBettingWindowUntil = Date.now() + 20000;
 
-// 台费（结算页面填写，结算时从每人扣除平均分摊，汇总给发起者）
+// 台费（结算页面填写，结算时从每人扣除平均分摊；台费为场地费用，不归属任何玩家）
 let pendingTableFee = 0;
 let settlementInitiatorMuzzle = null;
 
@@ -4675,25 +4685,21 @@ wss.on('connection', async function connection(ws, req) {
                         const remainder = tableFee - feePerPlayer * playerCount;
                         const initiatorName = MUZZLE_NAMES[requestMuzzle] || requestMuzzle;
 
-                        // 扣除每位玩家的台费，汇总给发起者
+                        // 扣除每位玩家的台费（台费为场地费用，平均分摊给所有玩家，含发起者；不汇总给发起者）
                         const tableFeeDetails = [];
                         gameState.players.forEach((player, idx) => {
                             let deduction = feePerPlayer;
                             if (idx < remainder) deduction += 1;
-                            if (player.muzzleType === requestMuzzle) {
-                                // 发起者：扣除自己那份后获得全部台费
-                                player.score = player.score - deduction + tableFee;
-                            } else {
-                                player.score = player.score - deduction;
-                            }
+                            // 所有玩家（含发起者）统一扣台费，台费不归属任何玩家
+                            player.score = player.score - deduction;
                             tableFeeDetails.push({
                                 id: player.id,
                                 name: player.name,
                                 nickname: player.nickname || '',
                                 muzzleType: player.muzzleType,
                                 deduction: deduction,             // 本次扣除
-                                isInitiator: player.muzzleType === requestMuzzle,
-                                netChange: player.muzzleType === requestMuzzle ? (tableFee - deduction) : (-deduction) // 净收支（发起者净收入）
+                                isInitiator: player.muzzleType === requestMuzzle, // 仅标记发起人（用于展示）
+                                netChange: -deduction // 净收支（所有玩家均为台费支出）
                             });
                         });
 
@@ -4717,20 +4723,12 @@ wss.on('connection', async function connection(ws, req) {
                         // 记录日志
                         await logGameEvent(`${initiatorName}发起台费扣除，总金额${tableFee}，每人扣除${feePerPlayer}（余数${remainder}分给前${remainder}位）`, 'info');
 
-                        // 发送通知：非发起者看到扣除信息，发起者看到收入信息
-                        const netIncome = tableFee - feePerPlayer - (gameState.players.findIndex(p => p.muzzleType === requestMuzzle) < remainder ? 1 : 0);
+                        // 发送通知：所有玩家（含发起者）统一看到扣除信息
                         clients.forEach(client => {
                             if (client.readyState !== WebSocket.OPEN) return;
                             const clientMuzzle = client.muzzle;
-                            if (clientMuzzle === requestMuzzle) {
-                                // 发起者：仅显示台费收入
-                                client.send(JSON.stringify({
-                                    type: 'info',
-                                    msg: `台费收入 ${tableFee} 元`,
-                                    duration: 8000
-                                }));
-                            } else if (clientMuzzle) {
-                                // 其他玩家：显示谁发起的、总金额、本次扣除
+                            if (clientMuzzle) {
+                                // 显示谁发起的、总金额、本次扣除
                                 let myDeduction = feePerPlayer;
                                 const myIdx = gameState.players.findIndex(p => p.muzzleType === clientMuzzle);
                                 if (myIdx >= 0 && myIdx < remainder) myDeduction += 1;
@@ -6061,6 +6059,29 @@ async function executeSettlement() {
             const totalTableFee = tableFeeRecords.reduce((sum, r) => sum + (r.tableFee || 0), 0);
             
             const finalRemark = pendingSettlementRemark || '';
+            // 计算每个玩家的台费净收支与纯对局分
+            // 台费为场地费用：所有玩家（含发起者）均计支出；胜负/胜率统计只认纯对局分 gameScore
+            const playerScoreData = prevGameState.players.map(p => {
+                let tfNet = 0;
+                for (const tf of tableFeeRecords) {
+                    const me = (tf.players || []).find(x => x && x.muzzleType === p.muzzleType);
+                    if (me) tfNet += (me.netChange !== undefined ? me.netChange : -(me.deduction || 0));
+                }
+                tfNet = Math.round(tfNet);
+                const score = p.score;
+                return {
+                    id: p.id != null ? p.id : undefined,
+                    name: p.name,
+                    nickname: p.nickname || '',
+                    muzzleType: p.muzzleType,
+                    score: score,
+                    tableFeeNet: tfNet,          // 本场台费净收支（支出为负）
+                    gameScore: Math.round(score - tfNet), // 纯对局分（不含台费，用于胜率/胜负判定）
+                    // 注册用户身份：结算归属与胜率统计的关键字段
+                    userId: p.userId || null,
+                    userNickname: p.userNickname || p.nickname || ''
+                };
+            });
             const settlementRecord = {
                 id: settleTimeMs,
                 timestamp: settleTimeStr,
@@ -6069,16 +6090,7 @@ async function executeSettlement() {
                 duration: durationStr,
                 remark: finalRemark || '',
                 playerOrder: preservedOrder,
-                players: prevGameState.players.map(p => ({
-                    id: p.id != null ? p.id : undefined,
-                    name: p.name,
-                    nickname: p.nickname || '',
-                    muzzleType: p.muzzleType,
-                    score: p.score,
-                    // 注册用户身份：结算归属与胜率统计的关键字段
-                    userId: p.userId || null,
-                    userNickname: p.userNickname || p.nickname || ''
-                })),
+                players: playerScoreData,
                 extraScoreRecords: extraScoreRecords,
                 extraScoreHistory: extraScoreHistory,
                 history: prevGameState.history.filter(r => !r.isUndo && r.type !== 'manual' && r.type !== 'settlement' && r.type !== 'extra_score_set' && r.type !== 'guest_bet_set'),
