@@ -476,7 +476,15 @@ const scoreServer = http.createServer((req, res) => {
                 const tfNet = (me.tableFeeNet !== undefined && me.tableFeeNet !== null) ? me.tableFeeNet : 0;
                 gameScore = score - tfNet;
             }
-            totalScore += gameScore;
+            // 展示分：纯对局分再扣除本场支出的台费（台费收入不计入展示；老数据无台费记录时扣款为0）
+            let feePaid = 0;
+            for (const tr of (s.tableFeeRecords || [])) {
+                for (const tp of (tr.players || [])) {
+                    if (String(tp.id) === String(me.id)) feePaid += (tp.deduction || 0);
+                }
+            }
+            const displayScore = gameScore - feePaid;
+            totalScore += displayScore;
             if (gameScore > 0) winSessions++;
             // history 中的 winnerId 为 1-based 玩家编号，对应 players 中 id 字段（缺省用下标+1）
             const myId = (me.id != null) ? me.id : (myIndex + 1);
@@ -492,6 +500,7 @@ const scoreServer = http.createServer((req, res) => {
                 muzzleType: me.muzzleType,
                 score: score,
                 gameScore: gameScore, // 纯对局分（不含台费），用于胜负场次判定
+                displayScore: displayScore, // 展示分：纯对局分再扣本场台费支出（排行榜/个人战绩展示用）
                 totalRounds: rTotal,
                 winRounds: rWin,
                 remark: s.remark || ''
@@ -2709,9 +2718,16 @@ function generateSettlementHistoryJS() {
     js += '    if (m) { return m[1] + "/" + m[2] + "/" + m[3] + " " + (parseInt(m[4])<10?"0"+m[4]:m[4]) + ":" + m[5] + ":" + m[6]; }\n';
     js += '    return str;\n';
     js += '}\n';
+    js += '// 展示分：纯对局分再扣除该玩家本场支出的台费（台费收入不计入展示；老数据无台费记录时扣款为0）\n';
+    js += 'function _settlementDisplayScore(p, settlement) {\n';
+    js += '    var gs = (p.gameScore !== undefined && p.gameScore !== null) ? p.gameScore : p.score;\n';
+    js += '    var fee = 0;\n';
+    js += '    try { (settlement.tableFeeRecords || []).forEach(function(tr){ (tr.players || []).forEach(function(tp){ if (String(tp.id) === String(p.id)) fee += (tp.deduction || 0); }); }); } catch(e) {}\n';
+    js += '    return gs - fee;\n';
+    js += '}\n';
     js += '// 计算结算统计\n';
     js += 'function calcSettlementStats(settlement) {\n';
-    js += '    var players = settlement.players.map(function(p, i) { return { id: i + 1, name: p.name, nickname: p.nickname || "", muzzleType: p.muzzleType, score: (p.gameScore !== undefined && p.gameScore !== null) ? p.gameScore : p.score }; });\n';
+    js += '    var players = settlement.players.map(function(p, i) { return { id: i + 1, name: p.name, nickname: p.nickname || "", muzzleType: p.muzzleType, score: _settlementDisplayScore(p, settlement) }; });\n';
     js += '    var history = settlement.history || [];\n';
     js += '    var scoreItemNames = ["摸张", "独赢", "东风", "二五"];\n';
     js += '    return players.map(function(player) {\n';
@@ -2834,8 +2850,8 @@ function generateSettlementHistoryJS() {
     js += '                html += \'<div class="settlement-list-scores">\';\n';
     js += '                for (var j = 0; j < s.players.length; j++) {\n';
     js += '                    var p = s.players[j];\n';
-    js += '                    // 展示纯对局分（未计入台费），缺失时回退账面分\n';
-    js += '                    var gs = (p.gameScore !== undefined && p.gameScore !== null) ? p.gameScore : p.score;\n';
+    js += '                    // 展示分 = 纯对局分再扣除该玩家本场支出的台费（台费收入不计入展示），缺失时回退账面分\n';
+    js += '                    var gs = _settlementDisplayScore(p, s);\n';
     js += '                    var cls = gs >= 0 ? "win" : "lose";\n';
     js += '                    var sign = gs >= 0 ? "+" : "";\n';
     js += '                    var display = p.userNickname || p.nickname ? (p.name + " / " + (p.userNickname || p.nickname)) : p.name;\n';

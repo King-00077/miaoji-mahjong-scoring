@@ -9157,6 +9157,23 @@ body.guest-mode .manual-score-btn {
             return hours + 'h' + minutes + 'm';
         }
 
+        // 结算展示分：纯对局分 gameScore 再扣除该玩家本场支出的台费（台费收入不计入展示）
+        // 老数据无台费记录时扣款为0，退化为纯对局分
+        function calcDisplayScore(p, settlement) {
+            var gs = (p && p.gameScore !== undefined && p.gameScore !== null) ? p.gameScore : (p ? p.score : 0);
+            if (typeof gs !== 'number' || isNaN(gs)) gs = (p && p.score) || 0;
+            var fee = 0;
+            try {
+                var trs = (settlement && settlement.tableFeeRecords) || [];
+                trs.forEach(function(tr) {
+                    (tr.players || []).forEach(function(tp) {
+                        if (String(tp.id) === String(p.id)) fee += (tp.deduction || 0);
+                    });
+                });
+            } catch(e) {}
+            return gs - fee;
+        }
+
         // 生成三层布局的历史结算卡片HTML（前端历史页、离线历史页共用）
         function generateSettlementCardHtml(settlement, isOffline) {
             if (!settlement || !settlement.players || !Array.isArray(settlement.players)) {
@@ -9168,9 +9185,9 @@ body.guest-mode .manual-score-btn {
             const totalRounds = (settlement.history || []).filter(r => r.type !== 'tableFee' && r.type !== 'extra_score_set' && r.type !== 'guest_bet_set').length || settlement.totalRounds || 0;
 
             // 玩家分数：2x2网格，嘴子/昵称 + 本局得分（紧贴时间正下方）
-            // 展示纯对局分（未计入台费，台费收支在台费明细单独展示），缺失时回退账面分
+            // 展示分 = 纯对局分再扣除该玩家本场支出的台费（台费收入不计入展示），缺失时回退账面分
             const playerScores = (settlement.players || []).map(p => {
-                const score = (p.gameScore !== undefined && p.gameScore !== null) ? p.gameScore : p.score;
+                const score = calcDisplayScore(p, settlement);
                 const isIncome = score > 0;
                 const isExpense = score < 0;
                 const sign = isIncome ? '+' : '';
@@ -10292,29 +10309,25 @@ body.guest-mode .manual-score-btn {
                 var durationStr = ''; try { durationStr = calcSettlementDuration(settlement) || ''; } catch(e) {}
 
                 // 基本信息 + 支付建议（右侧）
-                var infoDiv = _ce('div', 'padding:10px 16px;background:#f5f5f5;font-size:0.78rem;color:#999;display:flex;justify-content:space-between;gap:10px;');
-                var leftInfo = _ce('div', 'flex:1;min-width:0;');
-                leftInfo.appendChild(_ce('div', 'margin-bottom:3px;', (settlement.timestamp || '未知')));
+                var infoDiv = _ce('div', 'padding:10px 16px;background:#f5f5f5;font-size:0.78rem;color:#999;');
+                infoDiv.appendChild(_ce('div', '', (settlement.timestamp || '未知')));
+                infoDiv.appendChild(_ce('div', '', '对局时长: ' + (durationStr || '未知')));
                 var tfTotal = settlement.totalTableFee || 0;
                 if (!tfTotal && settlement.tableFeeRecords) {
                     settlement.tableFeeRecords.forEach(function(tr) { tfTotal += (tr.tableFee || 0); });
                 }
-                var infoLine2 = '对局时长: ' + (durationStr || '未知') + ' | 总局数: ' + totalRounds + '局';
-                if (tfTotal > 0) infoLine2 += ' | 总台费: ' + tfTotal;
-                leftInfo.appendChild(_ce('div', '', infoLine2));
-                infoDiv.appendChild(leftInfo);
-                // 支付建议（按含台费的账面分 score 计算，纯文字排版与左侧时间信息一致）
-                var payWrap = _ce('div', 'flex:0 0 auto;max-width:50%;min-width:150px;');
+                infoDiv.appendChild(_ce('div', '', '总局数: ' + totalRounds + '局' + (tfTotal > 0 ? ' | 总台费: ' + tfTotal : '')));
+                // 支付建议（按含台费的账面分 score 计算，四行排版）
+                infoDiv.appendChild(_ce('div', 'font-weight:600;margin-top:3px;', '支付建议'));
                 var payHtml = '';
                 try { payHtml = buildSettlementPaymentHtml(settlement); } catch(e) { payHtml = ''; }
                 if (payHtml) {
                     var payBody = _ce('div', 'line-height:1.6;');
                     payBody.innerHTML = payHtml;
-                    payWrap.appendChild(payBody);
+                    infoDiv.appendChild(payBody);
                 } else {
-                    payWrap.appendChild(_ce('div', '', '无需支付'));
+                    infoDiv.appendChild(_ce('div', '', '无需支付'));
                 }
-                infoDiv.appendChild(payWrap);
                 overviewPanel.appendChild(infoDiv);
 
                 // 备注区域（时间正下方，显示+编辑合一）
@@ -10371,8 +10384,8 @@ body.guest-mode .manual-score-btn {
                             nameContainer.appendChild(nickSpan);
                         }
                         cardHead.appendChild(nameContainer);
-                        // 展示纯对局分（未计入台费），缺失时回退账面分
-                        var gs = (p.gameScore !== undefined && p.gameScore !== null) ? p.gameScore : p.score;
+                        // 展示分 = 纯对局分再扣除该玩家本场支出的台费（台费收入不计入展示），缺失时回退账面分
+                        var gs = calcDisplayScore(p, settlement);
                         var scoreColor = gs >= 0 ? '#e74c3c' : '#27ae60';
                         cardHead.appendChild(_ce('span', 'font-weight:700;color:' + scoreColor + ';font-size:0.9rem;', (gs >= 0 ? '+' : '') + gs));
                         card.appendChild(cardHead);
@@ -12841,7 +12854,7 @@ body.guest-mode .manual-score-btn {
                 } else {
                     let html = '<div style="margin-top:14px; font-size:0.85rem; font-weight:bold; color:#555; margin-bottom:8px;">对局明细</div>';
                     s.details.forEach(d => {
-                        const gs = (d.gameScore !== undefined && d.gameScore !== null) ? d.gameScore : d.score;
+                        const gs = (d.displayScore !== undefined && d.displayScore !== null) ? d.displayScore : ((d.gameScore !== undefined && d.gameScore !== null) ? d.gameScore : d.score);
                         const sc = gs > 0 ? '#2e7d32' : (gs < 0 ? '#c62828' : '#666');
                         const rate = d.totalRounds > 0 ? Math.round(d.winRounds / d.totalRounds * 100) : 0;
                         html += `
@@ -13040,7 +13053,7 @@ body.guest-mode .manual-score-btn {
                 if (wins.length > 0) {
                     html += '<div style="font-size:0.85rem; font-weight:bold; color:#2e7d32; margin:10px 0 6px;"><i class="fas fa-arrow-up"></i> 胜场明细</div>';
                     wins.forEach(d => {
-                        const gs = (d.gameScore !== undefined && d.gameScore !== null) ? d.gameScore : d.score;
+                        const gs = (d.displayScore !== undefined && d.displayScore !== null) ? d.displayScore : ((d.gameScore !== undefined && d.gameScore !== null) ? d.gameScore : d.score);
                         html += `<div style="display:flex; justify-content:space-between; padding:8px 11px; border-left:3px solid #2e7d32; background:#f6fbf7; border-radius:6px; margin-bottom:6px; font-size:0.82rem;">
                             <div><div style="color:#333;">${d.timestamp}</div><div style="color:#999; font-size:0.72rem;">${d.totalRounds}局 胜${d.winRounds} · ${d.duration}</div></div>
                             <div style="font-weight:bold; color:#2e7d32;">+${gs}</div>
@@ -13050,7 +13063,7 @@ body.guest-mode .manual-score-btn {
                 if (losses.length > 0) {
                     html += '<div style="font-size:0.85rem; font-weight:bold; color:#c62828; margin:14px 0 6px;"><i class="fas fa-arrow-down"></i> 败场明细</div>';
                     losses.forEach(d => {
-                        const gs = (d.gameScore !== undefined && d.gameScore !== null) ? d.gameScore : d.score;
+                        const gs = (d.displayScore !== undefined && d.displayScore !== null) ? d.displayScore : ((d.gameScore !== undefined && d.gameScore !== null) ? d.gameScore : d.score);
                         html += `<div style="display:flex; justify-content:space-between; padding:8px 11px; border-left:3px solid #c62828; background:#fdf6f5; border-radius:6px; margin-bottom:6px; font-size:0.82rem;">
                             <div><div style="color:#333;">${d.timestamp}</div><div style="color:#999; font-size:0.72rem;">${d.totalRounds}局 胜${d.winRounds} · ${d.duration}</div></div>
                             <div style="font-weight:bold; color:#c62828;">${gs}</div>
