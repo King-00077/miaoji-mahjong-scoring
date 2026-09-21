@@ -9567,6 +9567,51 @@ body.guest-mode .manual-score-btn {
             return payments;
         }
 
+        // 历史结算详情：生成支付建议HTML
+        // 使用含台费的账面分 score 计算（台费归发起者，实际现金清账需含台费）
+        function buildSettlementPaymentHtml(settlement) {
+            var arr = (settlement.players || []).map(function(p) {
+                return { name: p.name || '', nickname: p.nickname || '', muzzleType: p.muzzleType || '', score: (typeof p.score === 'number') ? p.score : 0 };
+            });
+            // 活跃游客纳入清账（有非零分/有下注/有明细）
+            (settlement.guests || []).forEach(function(g) {
+                var gs = g.score || 0;
+                var hasBet = g.bets && Object.keys(g.bets).length > 0;
+                var hasDetails = g.details && g.details.length > 0;
+                if (gs !== 0 || hasBet || hasDetails) {
+                    arr.push({ name: (g.name || '游客'), nickname: '', muzzleType: '', score: gs, _isGuest: true });
+                }
+            });
+            var sorted = arr.slice().sort(function(a, b) { return a.score - b.score; });
+            var payments = [];
+            var i = 0, j = sorted.length - 1;
+            while (i < j) {
+                var debtor = sorted[i], creditor = sorted[j];
+                if (debtor.score >= 0) break;
+                if (creditor.score <= 0) break;
+                var amount = Math.min(-debtor.score, creditor.score);
+                if (amount > 0) {
+                    var fromName = debtor._isGuest ? ('游客 ' + debtor.name) : (debtor.name + (debtor.nickname ? ' / ' + debtor.nickname : ''));
+                    var toName = creditor._isGuest ? ('游客 ' + creditor.name) : (creditor.name + (creditor.nickname ? ' / ' + creditor.nickname : ''));
+                    payments.push({ from: fromName, to: toName, amount: Math.round(amount) });
+                }
+                debtor.score += amount;
+                creditor.score -= amount;
+                if (Math.abs(debtor.score) < 0.001) i++;
+                if (Math.abs(creditor.score) < 0.001) j--;
+            }
+            if (!payments.length) return '';
+            // HTML 转义玩家名，避免特殊字符注入
+            function escS(name) {
+                return String(name == null ? '' : name)
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            }
+            return payments.map(function(p) {
+                return '<div style="display:flex;justify-content:space-between;gap:6px;padding:2px 0;font-size:0.72rem;color:#555;border-bottom:1px dashed #eee;">' +
+                    '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escS(p.from) + ' 支付 ' + p.amount + ' 给 ' + escS(p.to) + '</span></div>';
+            }).join('');
+        }
+
         // 通过微信包名（com.tencent.mm）拉起微信 App（Android intent 协议；iOS/其他用 weixin:// scheme）
         function openWeixinApp() {
             var ua = navigator.userAgent || '';
@@ -10247,10 +10292,31 @@ body.guest-mode .manual-score-btn {
                 var totalRounds = (settlement.history || []).filter(r => r.type !== 'tableFee' && r.type !== 'extra_score_set' && r.type !== 'guest_bet_set').length || settlement.totalRounds || 0;
                 var durationStr = ''; try { durationStr = calcSettlementDuration(settlement) || ''; } catch(e) {}
 
-                // 基本信息
-                var infoDiv = _ce('div', 'padding:10px 16px;background:#f5f5f5;font-size:0.78rem;color:#999;');
-                infoDiv.appendChild(_ce('div', 'margin-bottom:3px;', '结算时间: ' + (settlement.timestamp || '未知')));
-                infoDiv.appendChild(_ce('div', '', '对局时长: ' + (durationStr || '未知') + ' | 总局数: ' + totalRounds + '局'));
+                // 基本信息 + 支付建议（右侧）
+                var infoDiv = _ce('div', 'padding:10px 16px;background:#f5f5f5;font-size:0.78rem;color:#999;display:flex;justify-content:space-between;gap:10px;');
+                var leftInfo = _ce('div', 'flex:1;min-width:0;');
+                leftInfo.appendChild(_ce('div', 'margin-bottom:3px;', '结算时间: ' + (settlement.timestamp || '未知')));
+                var tfTotal = settlement.totalTableFee || 0;
+                if (!tfTotal && settlement.tableFeeRecords) {
+                    settlement.tableFeeRecords.forEach(function(tr) { tfTotal += (tr.tableFee || 0); });
+                }
+                var infoLine2 = '对局时长: ' + (durationStr || '未知') + ' | 总局数: ' + totalRounds + '局';
+                if (tfTotal > 0) infoLine2 += ' | 总台费: ' + tfTotal;
+                leftInfo.appendChild(_ce('div', '', infoLine2));
+                infoDiv.appendChild(leftInfo);
+                // 支付建议（按含台费的账面分 score 计算，台费归发起者，实际清账需含台费）
+                var payWrap = _ce('div', 'flex:0 0 auto;max-width:50%;min-width:150px;background:#fff8ec;border:1px solid #f5d9a8;border-radius:6px;padding:5px 8px;');
+                payWrap.appendChild(_ce('div', 'font-weight:600;color:#b8860b;font-size:0.72rem;margin-bottom:2px;', '支付建议（含台费）'));
+                var payHtml = '';
+                try { payHtml = buildSettlementPaymentHtml(settlement); } catch(e) { payHtml = ''; }
+                if (payHtml) {
+                    var payBody = _ce('div', 'line-height:1.5;');
+                    payBody.innerHTML = payHtml;
+                    payWrap.appendChild(payBody);
+                } else {
+                    payWrap.appendChild(_ce('div', 'color:#999;font-size:0.72rem;', '无需支付'));
+                }
+                infoDiv.appendChild(payWrap);
                 overviewPanel.appendChild(infoDiv);
 
                 // 备注区域（时间正下方，显示+编辑合一）
