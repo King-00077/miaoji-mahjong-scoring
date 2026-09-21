@@ -10308,26 +10308,30 @@ body.guest-mode .manual-score-btn {
                 var totalRounds = (settlement.history || []).filter(r => r.type !== 'tableFee' && r.type !== 'extra_score_set' && r.type !== 'guest_bet_set').length || settlement.totalRounds || 0;
                 var durationStr = ''; try { durationStr = calcSettlementDuration(settlement) || ''; } catch(e) {}
 
-                // 基本信息 + 支付建议（右侧）
-                var infoDiv = _ce('div', 'padding:10px 16px;background:#f5f5f5;font-size:0.78rem;color:#999;');
-                infoDiv.appendChild(_ce('div', '', (settlement.timestamp || '未知')));
-                infoDiv.appendChild(_ce('div', '', '对局时长: ' + (durationStr || '未知')));
+                // 基本信息 + 支付建议（左右两个板块：左侧时间/时长/总局数+台费，右侧支付建议独占一行）
+                var infoDiv = _ce('div', 'padding:10px 16px;background:#f5f5f5;font-size:0.78rem;color:#999;display:flex;justify-content:space-between;gap:12px;');
+                var leftInfo = _ce('div', 'flex:1;min-width:0;');
+                leftInfo.appendChild(_ce('div', '', (settlement.timestamp || '未知')));
+                leftInfo.appendChild(_ce('div', '', '对局时长: ' + (durationStr || '未知')));
                 var tfTotal = settlement.totalTableFee || 0;
                 if (!tfTotal && settlement.tableFeeRecords) {
                     settlement.tableFeeRecords.forEach(function(tr) { tfTotal += (tr.tableFee || 0); });
                 }
-                infoDiv.appendChild(_ce('div', '', '总局数: ' + totalRounds + '局' + (tfTotal > 0 ? ' | 总台费: ' + tfTotal : '')));
-                // 支付建议（按含台费的账面分 score 计算，四行排版）
-                infoDiv.appendChild(_ce('div', 'font-weight:600;margin-top:3px;', '支付建议'));
+                leftInfo.appendChild(_ce('div', '', '总局数: ' + totalRounds + '局' + (tfTotal > 0 ? ' | 总台费: ' + tfTotal : '')));
+                infoDiv.appendChild(leftInfo);
+                // 右侧：支付建议（按含台费的账面分 score 计算，标题独占一行）
+                var rightInfo = _ce('div', 'flex:0 0 auto;text-align:right;max-width:55%;');
+                rightInfo.appendChild(_ce('div', 'font-weight:600;', '支付建议'));
                 var payHtml = '';
                 try { payHtml = buildSettlementPaymentHtml(settlement); } catch(e) { payHtml = ''; }
                 if (payHtml) {
                     var payBody = _ce('div', 'line-height:1.6;');
                     payBody.innerHTML = payHtml;
-                    infoDiv.appendChild(payBody);
+                    rightInfo.appendChild(payBody);
                 } else {
-                    infoDiv.appendChild(_ce('div', '', '无需支付'));
+                    rightInfo.appendChild(_ce('div', '', '无需支付'));
                 }
+                infoDiv.appendChild(rightInfo);
                 overviewPanel.appendChild(infoDiv);
 
                 // 备注区域（时间正下方，显示+编辑合一）
