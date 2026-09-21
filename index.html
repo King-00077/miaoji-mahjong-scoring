@@ -3665,7 +3665,7 @@ body.guest-mode .manual-score-btn {
                             <i class="fas fa-hand-holding-usd"></i> 划扣
                         </button>
                     </div>
-                    <div style="font-size: 0.75rem; color: #888; margin-top: 4px;">输入金额后点击"划扣"，台费将平均从每位玩家扣除（台费为场地费用，不归属任何玩家）</div>
+                    <div style="font-size: 0.75rem; color: #888; margin-top: 4px;">输入金额后点击"划扣"，台费将平均从每位玩家扣除并汇总给您</div>
                 </div>
             </div>
             <div class="settlement-actions">
@@ -8360,11 +8360,40 @@ body.guest-mode .manual-score-btn {
                 const initiatorMuzzle = appState.myMuzzle;
                 const initiatorName = appState.players.find(p => p.muzzleType === initiatorMuzzle)?.name || '玩家';
 
+                const tableFeeDetails = [];
                 appState.players.forEach((player, idx) => {
                     let deduction = feePerPlayer;
                     if (idx < remainder) deduction += 1;
-                    // 台费为场地费用：所有玩家（含发起者）统一扣除，不汇总给发起者
-                    player.score = player.score - deduction;
+                    if (player.muzzleType === initiatorMuzzle) {
+                        // 发起者：扣除自己那份后获得全部台费
+                        player.score = player.score - deduction + tableFee;
+                    } else {
+                        player.score = player.score - deduction;
+                    }
+                    tableFeeDetails.push({
+                        id: player.id,
+                        name: player.name,
+                        nickname: player.nickname || '',
+                        muzzleType: player.muzzleType,
+                        deduction: deduction,
+                        isInitiator: player.muzzleType === initiatorMuzzle,
+                        netChange: player.muzzleType === initiatorMuzzle ? (tableFee - deduction) : (-deduction)
+                    });
+                });
+                // 记录台费划扣到本地历史（供离线结算计算纯对局分 gameScore，统计/局数均会跳过台费记录）
+                appState.history.push({
+                    type: 'tableFee',
+                    round: 0,
+                    tableFee: tableFee,
+                    initiatorMuzzle: initiatorMuzzle,
+                    initiatorName: initiatorName,
+                    feePerPlayer: feePerPlayer,
+                    remainder: remainder,
+                    playerCount: playerCount,
+                    players: tableFeeDetails,
+                    timestamp: new Date().toLocaleString('zh-CN', { hour12: false }),
+                    timestampMs: Date.now(),
+                    isLocal: true
                 });
 
                 showNotification(`${initiatorName}发起台费扣除，总金额 ${tableFee} 元，每人扣除 ${feePerPlayer} 元`, 'info', 8000);
@@ -8408,7 +8437,7 @@ body.guest-mode .manual-score-btn {
         // 保存结算数据到本地localStorage
         function saveSettlementToLocal() {
             try {
-                // 计算每位玩家的台费净收支（台费为场地费用，全员支出，不归属发起者）
+                // 计算每位玩家的台费净收支（台费归发起者：发起者净收入为正，其余为支出）
                 const tfRecs = appState.history.filter(r => r.type === 'tableFee' && !r.isUndo);
                 const players = appState.players.map(p => {
                     let tfNet = 0;
@@ -8861,8 +8890,7 @@ body.guest-mode .manual-score-btn {
                         const tfName = p.name || (tfP ? tfP.name : '未知');
                         const tfDeduction = p.deduction !== undefined ? p.deduction : (record.feePerPlayer || 0);
                         const tfIsInit = p.isInitiator !== undefined ? p.isInitiator : (p.muzzleType === record.initiatorMuzzle);
-                        // 台费为场地费用：所有玩家均为支出，netChange 缺失时一律按 -deduction
-                        const tfNet = p.netChange !== undefined ? p.netChange : (-tfDeduction);
+                        const tfNet = p.netChange !== undefined ? p.netChange : (tfIsInit ? ((record.tableFee || 0) - tfDeduction) : (-tfDeduction));
                         const tfColor = tfNet > 0 ? '#e67e22' : (tfNet < 0 ? '#27ae60' : '#888');
                         const tfSign = tfNet > 0 ? '+' : (tfNet < 0 ? '-' : '');
                         const tfLabel = tfIsInit ? (tfName + '（发起人）') : tfName;
@@ -9140,8 +9168,9 @@ body.guest-mode .manual-score-btn {
             const totalRounds = (settlement.history || []).filter(r => r.type !== 'tableFee' && r.type !== 'extra_score_set' && r.type !== 'guest_bet_set').length || settlement.totalRounds || 0;
 
             // 玩家分数：2x2网格，嘴子/昵称 + 本局得分（紧贴时间正下方）
+            // 展示纯对局分（未计入台费，台费收支在台费明细单独展示），缺失时回退账面分
             const playerScores = (settlement.players || []).map(p => {
-                const score = p.score;
+                const score = (p.gameScore !== undefined && p.gameScore !== null) ? p.gameScore : p.score;
                 const isIncome = score > 0;
                 const isExpense = score < 0;
                 const sign = isIncome ? '+' : '';
@@ -10278,8 +10307,10 @@ body.guest-mode .manual-score-btn {
                             nameContainer.appendChild(nickSpan);
                         }
                         cardHead.appendChild(nameContainer);
-                        var scoreColor = p.score >= 0 ? '#e74c3c' : '#27ae60';
-                        cardHead.appendChild(_ce('span', 'font-weight:700;color:' + scoreColor + ';font-size:0.9rem;', (p.score >= 0 ? '+' : '') + p.score));
+                        // 展示纯对局分（未计入台费），缺失时回退账面分
+                        var gs = (p.gameScore !== undefined && p.gameScore !== null) ? p.gameScore : p.score;
+                        var scoreColor = gs >= 0 ? '#e74c3c' : '#27ae60';
+                        cardHead.appendChild(_ce('span', 'font-weight:700;color:' + scoreColor + ';font-size:0.9rem;', (gs >= 0 ? '+' : '') + gs));
                         card.appendChild(cardHead);
                         var grid = _ce('div', 'display:grid;grid-template-columns:repeat(5,1fr);gap:4px;');
                         var stats4 = [
@@ -10401,12 +10432,11 @@ body.guest-mode .manual-score-btn {
                                     var tfName2 = tfp.name || getPlayerName(tfp.id);
                                     var tfDed2 = (tfp.deduction !== undefined) ? tfp.deduction : (tfRec.feePerPlayer || 0);
                                     var tfIs2 = (tfp.isInitiator !== undefined) ? tfp.isInitiator : (tfp.muzzleType === tfRec.initiatorMuzzle);
-                                    // 台费为场地费用：所有玩家均为支出，netChange 缺失时一律按 -deduction
-                                    var tfNet2 = (tfp.netChange !== undefined) ? tfp.netChange : (-tfDed2);
+                                    var tfNet2 = (tfp.netChange !== undefined) ? tfp.netChange : (tfIs2 ? ((tfRec.tableFee || 0) - tfDed2) : (-tfDed2));
                                     var tfCol2 = tfNet2 > 0 ? '#e67e22' : (tfNet2 < 0 ? '#27ae60' : '#888');
                                     var tfSig2 = tfNet2 > 0 ? '+' : (tfNet2 < 0 ? '-' : '');
                                     var row2 = _ce('div', 'display:flex;justify-content:space-between;padding:2px 0 2px 12px;font-size:0.68rem;color:#8a6d3b;');
-                                    row2.appendChild(_ce('span', '', tfIs2 ? (tfName2 + '（发起人，支出）') : (tfName2 + '（支出）')));
+                                    row2.appendChild(_ce('span', '', tfIs2 ? (tfName2 + '（发起人，收入）') : (tfName2 + '（支出）')));
                                     row2.appendChild(_ce('span', 'color:' + tfCol2 + ';font-weight:600;', tfSig2 + Math.abs(tfNet2)));
                                     tfDiv.appendChild(row2);
                                 });
@@ -10472,8 +10502,7 @@ body.guest-mode .manual-score-btn {
                                 var tfName = tfp.name || getPlayerName(tfp.id);
                                 var tfDeduction = (tfp.deduction !== undefined) ? tfp.deduction : (r.feePerPlayer || 0);
                                 var tfIsInit = (tfp.isInitiator !== undefined) ? tfp.isInitiator : (tfp.muzzleType === r.initiatorMuzzle);
-                                // 台费为场地费用：所有玩家均为支出，netChange 缺失时一律按 -deduction
-                                var tfNet = (tfp.netChange !== undefined) ? tfp.netChange : (-tfDeduction);
+                                var tfNet = (tfp.netChange !== undefined) ? tfp.netChange : (tfIsInit ? ((r.tableFee || 0) - tfDeduction) : (-tfDeduction));
                                 var tfColor = tfNet > 0 ? '#e67e22' : (tfNet < 0 ? '#27ae60' : '#888');
                                 var tfSign = tfNet > 0 ? '+' : (tfNet < 0 ? '-' : '');
                                 var tfLabel = tfIsInit ? (tfName + '（发起人）') : tfName;
@@ -12748,7 +12777,8 @@ body.guest-mode .manual-score-btn {
                 } else {
                     let html = '<div style="margin-top:14px; font-size:0.85rem; font-weight:bold; color:#555; margin-bottom:8px;">对局明细</div>';
                     s.details.forEach(d => {
-                        const sc = d.score > 0 ? '#2e7d32' : (d.score < 0 ? '#c62828' : '#666');
+                        const gs = (d.gameScore !== undefined && d.gameScore !== null) ? d.gameScore : d.score;
+                        const sc = gs > 0 ? '#2e7d32' : (gs < 0 ? '#c62828' : '#666');
                         const rate = d.totalRounds > 0 ? Math.round(d.winRounds / d.totalRounds * 100) : 0;
                         html += `
                         <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:1px solid #eee; border-radius:10px; margin-bottom:8px; font-size:0.85rem;">
@@ -12756,7 +12786,7 @@ body.guest-mode .manual-score-btn {
                                 <div style="color:#333; font-weight:bold;">${d.timestamp || ''}</div>
                                 <div style="color:#999; font-size:0.75rem; margin-top:2px;">${d.duration || ''} · ${d.totalRounds}局 胜${d.winRounds}（${rate}%）${d.remark ? ' · ' + d.remark : ''}</div>
                             </div>
-                            <div style="font-weight:bold; color:${sc}; font-size:1rem;">${d.score > 0 ? '+' : ''}${d.score}</div>
+                            <div style="font-weight:bold; color:${sc}; font-size:1rem;">${gs > 0 ? '+' : ''}${gs}</div>
                         </div>`;
                     });
                     detailsEl.innerHTML = html;
