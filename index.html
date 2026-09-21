@@ -9624,7 +9624,8 @@ body.guest-mode .manual-score-btn {
                     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
             }
             return payments.map(function(p) {
-                return '<div style="padding:1px 0;">' + escS(p.from) + ' 支付 ' + p.amount + ' 给 ' + escS(p.to) + '</div>';
+                // 金额用 3 字符宽度占位（一位/两位/三位数右对齐），保证各行数字对齐
+                return '<div style="padding:1px 0;">' + escS(p.from) + ' 支付 <span style="display:inline-block;min-width:3ch;text-align:right;">' + p.amount + '</span> 给 ' + escS(p.to) + '</div>';
             }).join('');
         }
 
@@ -10478,10 +10479,13 @@ body.guest-mode .manual-score-btn {
                         ];
                         var awardsGrid = _ce('div', 'display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin-bottom:8px;');
                         awards.forEach(function(a) {
-                            var card = _ce('div', 'background:#fafafa;border:1px solid #eee;border-radius:6px;padding:6px 8px;');
-                            card.appendChild(_ce('div', 'font-size:0.62rem;color:#888;', a.label));
-                            card.appendChild(_ce('div', 'font-size:0.78rem;font-weight:600;color:' + a.color + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;', a.name));
-                            card.appendChild(_ce('div', 'font-size:0.68rem;color:#999;', a.val));
+                            // 统计信息移至玩家名右侧：一行内 [玩家名 | 标签 数值]
+                            var card = _ce('div', 'background:#fafafa;border:1px solid #eee;border-radius:6px;padding:6px 8px;display:flex;align-items:center;justify-content:space-between;gap:6px;');
+                            card.appendChild(_ce('span', 'font-size:0.78rem;font-weight:600;color:' + a.color + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;', a.name));
+                            var rightInfo2 = _ce('span', 'font-size:0.7rem;color:#888;white-space:nowrap;');
+                            rightInfo2.appendChild(_ce('span', '', a.label + ' '));
+                            rightInfo2.appendChild(_ce('span', 'color:' + a.color + ';font-weight:600;', a.val));
+                            card.appendChild(rightInfo2);
                             awardsGrid.appendChild(card);
                         });
                         awardsSection.appendChild(awardsGrid);
