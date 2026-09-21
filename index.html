@@ -10326,7 +10326,8 @@ body.guest-mode .manual-score-btn {
                 var payHtml = '';
                 try { payHtml = buildSettlementPaymentHtml(settlement); } catch(e) { payHtml = ''; }
                 if (payHtml) {
-                    var payBody = _ce('div', 'line-height:1.6;');
+                    // 行距与左侧信息保持一致（不额外设置 line-height）
+                    var payBody = _ce('div', '');
                     payBody.innerHTML = payHtml;
                     rightInfo.appendChild(payBody);
                 } else {
@@ -10368,7 +10369,7 @@ body.guest-mode .manual-score-btn {
                 remarkRow.appendChild(remarkInput);
                 remarkRow.appendChild(remarkBtn);
                 remarkDiv.appendChild(remarkRow);
-                overviewPanel.appendChild(remarkDiv);
+                // 备注框延后到最下方（Phase 4 数据统计之后）再挂载
 
                 // === Phase 3: 玩家统计卡片（含名字+分数+统计数据，与服务器端一致） ===
                 setTimeout(function() {
@@ -10377,7 +10378,8 @@ body.guest-mode .manual-score-btn {
                     statsSection.appendChild(_ce('div', 'font-size:0.85rem;font-weight:600;color:#666;margin:8px 0;', '玩家统计'));
                     stats.forEach(function(p) {
                         var card = _ce('div', 'background:#f8f9ff;border-radius:8px;padding:10px;margin-bottom:6px;border:1px solid #e6e9f4;');
-                        var cardHead = _ce('div', 'display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;');
+                        var cardHead = _ce('div', 'display:flex;justify-content:space-between;align-items:center;gap:8px;');
+                        var headLeft = _ce('div', 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;');
                         // 玩家名 + 昵称（昵称小字浅色，用/分隔）
                         var nameContainer = _ce('span', 'font-weight:600;color:#2c3e50;font-size:0.85rem;');
                         var muzzleName = p.name || '未知';
@@ -10388,13 +10390,9 @@ body.guest-mode .manual-score-btn {
                             var nickSpan = _ce('span', 'opacity:0.65;font-size:0.85em;font-weight:normal;', ' / ' + nickname);
                             nameContainer.appendChild(nickSpan);
                         }
-                        cardHead.appendChild(nameContainer);
-                        // 展示分 = 纯对局分再扣除该玩家本场支出的台费（台费收入不计入展示），缺失时回退账面分
-                        var gs = calcDisplayScore(p, settlement);
-                        var scoreColor = gs >= 0 ? '#e74c3c' : '#27ae60';
-                        cardHead.appendChild(_ce('span', 'font-weight:700;color:' + scoreColor + ';font-size:0.9rem;', (gs >= 0 ? '+' : '') + gs));
-                        card.appendChild(cardHead);
-                        var grid = _ce('div', 'display:grid;grid-template-columns:repeat(5,1fr);gap:4px;');
+                        headLeft.appendChild(nameContainer);
+                        // 统计信息（胜率/获胜/自摸/庄家/连胜）行内显示在玩家名右侧
+                        var statsInline = _ce('div', 'display:flex;gap:6px;flex-wrap:wrap;');
                         var stats4 = [
                             {val: p.winRate || '0%', color: '#1a6dcc', label: '胜率'},
                             {val: String(p.winCount || 0), color: '#e74c3c', label: '获胜'},
@@ -10403,12 +10401,18 @@ body.guest-mode .manual-score-btn {
                             {val: String(p.maxWinStreak || 0), color: '#9b59b6', label: '连胜'}
                         ];
                         stats4.forEach(function(s) {
-                            var cell = _ce('div', 'text-align:center;background:white;padding:4px 2px;border-radius:4px;');
-                            cell.appendChild(_ce('div', 'font-size:0.85rem;font-weight:700;color:' + s.color + ';', s.val));
-                            cell.appendChild(_ce('div', 'font-size:0.6rem;color:#888;', s.label));
-                            grid.appendChild(cell);
+                            var cell = _ce('span', 'font-size:0.68rem;white-space:nowrap;');
+                            cell.appendChild(_ce('span', 'color:#888;', s.label + ' '));
+                            cell.appendChild(_ce('span', 'color:' + s.color + ';font-weight:600;', s.val));
+                            statsInline.appendChild(cell);
                         });
-                        card.appendChild(grid);
+                        headLeft.appendChild(statsInline);
+                        cardHead.appendChild(headLeft);
+                        // 展示分 = 纯对局分再扣除该玩家本场支出的台费（台费收入不计入展示），缺失时回退账面分
+                        var gs = calcDisplayScore(p, settlement);
+                        var scoreColor = gs >= 0 ? '#e74c3c' : '#27ae60';
+                        cardHead.appendChild(_ce('span', 'font-weight:700;color:' + scoreColor + ';font-size:0.9rem;', (gs >= 0 ? '+' : '') + gs));
+                        card.appendChild(cardHead);
                         // 梁数统计（单独一行）
                         if (p.liangCounts) {
                             var liangKeys = [3, 4, 5, 6, 7];
@@ -10553,6 +10557,9 @@ body.guest-mode .manual-score-btn {
                         }
 
                         overviewPanel.appendChild(awardsSection);
+
+                        // 备注框置于弹窗最下方（数据统计之后）
+                        if (remarkDiv && remarkDiv.parentNode !== overviewPanel) overviewPanel.appendChild(remarkDiv);
                     }, 50);
                 }, 50);
             }, 50);
