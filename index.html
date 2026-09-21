@@ -10294,7 +10294,7 @@ body.guest-mode .manual-score-btn {
                 // 基本信息 + 支付建议（右侧）
                 var infoDiv = _ce('div', 'padding:10px 16px;background:#f5f5f5;font-size:0.78rem;color:#999;display:flex;justify-content:space-between;gap:10px;');
                 var leftInfo = _ce('div', 'flex:1;min-width:0;');
-                leftInfo.appendChild(_ce('div', 'margin-bottom:3px;', '结算时间: ' + (settlement.timestamp || '未知')));
+                leftInfo.appendChild(_ce('div', 'margin-bottom:3px;', (settlement.timestamp || '未知')));
                 var tfTotal = settlement.totalTableFee || 0;
                 if (!tfTotal && settlement.tableFeeRecords) {
                     settlement.tableFeeRecords.forEach(function(tr) { tfTotal += (tr.tableFee || 0); });
@@ -10305,7 +10305,6 @@ body.guest-mode .manual-score-btn {
                 infoDiv.appendChild(leftInfo);
                 // 支付建议（按含台费的账面分 score 计算，纯文字排版与左侧时间信息一致）
                 var payWrap = _ce('div', 'flex:0 0 auto;max-width:50%;min-width:150px;');
-                payWrap.appendChild(_ce('div', 'font-weight:600;margin-bottom:2px;', '支付建议'));
                 var payHtml = '';
                 try { payHtml = buildSettlementPaymentHtml(settlement); } catch(e) { payHtml = ''; }
                 if (payHtml) {
