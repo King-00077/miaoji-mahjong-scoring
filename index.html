@@ -6811,9 +6811,13 @@ body.guest-mode .manual-score-btn {
             }
 
             // 初始化页面左上角用户信息按钮：未登录时展开登录页面，已登录时弹出用户信息（含战绩/修改用户名/修改密码）
+            // 长按 600ms 跳转监控端 /admin
             const initUserBtn = document.getElementById('initUserBtn');
             if (initUserBtn) {
+                let _pressTimer = null;
+                let _longFired = false;
                 initUserBtn.addEventListener('click', function() {
+                    if (_longFired) { _longFired = false; return; } // 长按已触发，抑制本次 click
                     if (!getCurrentUser()) {
                         if (typeof showUserAuthPanel === 'function') showUserAuthPanel();
                         else if (typeof showUserInfoPanel === 'function') showUserInfoPanel();
@@ -6823,6 +6827,25 @@ body.guest-mode .manual-score-btn {
                         showNicknameEditPanel();
                     }
                 });
+                // 长按检测：touchstart/mousedown 启动定时器，600ms 后跳转监控端
+                function _onPressStart(e) {
+                    _longFired = false;
+                    _pressTimer = setTimeout(function() {
+                        _longFired = true;
+                        // 跳转监控端：同源当前域名下的 /admin
+                        var adminUrl = window.location.origin + '/admin';
+                        window.location.href = adminUrl;
+                    }, 600);
+                }
+                function _onPressEnd(e) {
+                    if (_pressTimer) { clearTimeout(_pressTimer); _pressTimer = null; }
+                }
+                initUserBtn.addEventListener('touchstart', _onPressStart, { passive: true });
+                initUserBtn.addEventListener('touchend', _onPressEnd);
+                initUserBtn.addEventListener('touchcancel', _onPressEnd);
+                initUserBtn.addEventListener('mousedown', _onPressStart);
+                initUserBtn.addEventListener('mouseup', _onPressEnd);
+                initUserBtn.addEventListener('mouseleave', _onPressEnd);
             }
 
             // 嘴子计分器标题3击弹出分值选择
@@ -10036,6 +10059,101 @@ body.guest-mode .manual-score-btn {
             return str;
         }
 
+        // 显示某玩家某类别的对局列表（从结算详情统计数字点击触发）
+        function showPlayerRoundMatches(settlement, player, category, categoryLabel) {
+            if (!settlement || !settlement.history || !player) return;
+            // 过滤出该玩家相关的对局
+            var allRounds = settlement.history.filter(function(r) {
+                if (r.type === 'tableFee' || r.type === 'extra_score_set' || r.type === 'guest_bet_set') return false;
+                return true;
+            });
+            var rounds = allRounds.filter(function(r) {
+                var isWin = r.winnerId === player.id;
+                switch (category) {
+                    case 'all': return true;
+                    case 'win': return isWin;
+                    case 'selfdraw': return isWin && r.isSelfDrawn;
+                    case 'banker': return isWin && r.bankerId === player.id;
+                    case 'liang3':
+                    case 'liang4':
+                    case 'liang5':
+                    case 'liang6':
+                    case 'liang7': {
+                        var n = parseInt(category.replace('liang', ''), 10);
+                        if (!isWin) return false;
+                        var items = (r.details || []).filter(function(d) { return d !== '七梁' && d !== '自摸' && !d.startsWith('庄家额外分'); });
+                        return (items.length + 2) === n;
+                    }
+                    default: return true;
+                }
+            });
+            if (rounds.length === 0) { showNotification('暂无相关对局', 'info', 1500); return; }
+
+            var modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+            var content = document.createElement('div');
+            content.style.cssText = 'background:#fff;border-radius:12px;max-width:480px;width:100%;max-height:80vh;overflow-y:auto;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,0.2);';
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+
+            var head = document.createElement('div');
+            head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
+            var pName = player.name || ('玩家' + player.id);
+            head.appendChild(_ce('div', 'font-weight:700;color:#2c3e50;font-size:0.95rem;', pName + ' · ' + categoryLabel + '（' + rounds.length + '局）'));
+            var closeBtn = _ce('div', 'width:28px;height:28px;line-height:28px;text-align:center;border-radius:50%;background:#f0f0f0;cursor:pointer;color:#888;font-size:0.9rem;', '×');
+            closeBtn.onclick = function() { if (modal.parentNode) modal.parentNode.removeChild(modal); };
+            head.appendChild(closeBtn);
+            content.appendChild(head);
+
+            function playerNameById(pid) {
+                var p = settlement.players[pid - 1];
+                return p ? (p.name || ('玩家' + pid)) : ('玩家' + pid);
+            }
+            // 倒序：最新对局在最上
+            for (var i = rounds.length - 1; i >= 0; i--) {
+                var r = rounds[i];
+                var box = _ce('div', 'position:relative;overflow:hidden;padding:8px 10px;margin-bottom:6px;background:#f8f9ff;border:1px solid #e6e9f4;border-radius:8px;');
+                if (r.isSelfDrawn) {
+                    var wm = _ce('div', 'position:absolute;right:6px;top:50%;transform:translateY(-50%) rotate(-18deg);font-size:1.9rem;font-weight:900;color:rgba(155,89,182,0.18);pointer-events:none;letter-spacing:2px;white-space:nowrap;', '自摸');
+                    box.appendChild(wm);
+                }
+                var t = '';
+                try { t = formatRoundTime(r.timestamp); } catch(e) {}
+                box.appendChild(_ce('div', 'font-weight:700;font-size:0.85rem;color:#2c3e50;', '第' + (r.round || '?') + '局' + (t ? '（' + t + '）' : '')));
+                var wName = r.winnerId ? playerNameById(r.winnerId) : '未知';
+                var bName = r.bankerId ? playerNameById(r.bankerId) : '未知';
+                var meta = _ce('div', 'font-size:0.78rem;color:#555;margin-top:3px;', '');
+                meta.appendChild(_ce('span', 'color:#e74c3c;font-weight:600;', '赢家:' + wName));
+                meta.appendChild(document.createTextNode('  '));
+                meta.appendChild(_ce('span', 'color:#3498db;', '庄家:' + bName));
+                box.appendChild(meta);
+                if (r.details && r.details.length > 0) {
+                    var tags = _ce('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;');
+                    r.details.forEach(function(d) {
+                        tags.appendChild(_ce('span', 'padding:1px 7px;background:rgba(102,126,234,0.12);color:#667eea;border-radius:10px;font-size:0.7rem;', d));
+                    });
+                    box.appendChild(tags);
+                }
+                // 该玩家本局收支
+                if (r.playerPayments && r.playerPayments.length > 0) {
+                    var pay = null;
+                    for (var pi = 0; pi < r.playerPayments.length; pi++) {
+                        if (r.playerPayments[pi] && r.playerPayments[pi].id === player.id) { pay = r.playerPayments[pi]; break; }
+                    }
+                    if (pay) {
+                        var change = -(pay.amount || 0);
+                        var cColor = change > 0 ? '#e74c3c' : (change < 0 ? '#27ae60' : '#888');
+                        var cSign = change > 0 ? '+' : '';
+                        var payRow = _ce('div', 'margin-top:4px;font-size:0.78rem;color:#555;', '本局收支: ');
+                        payRow.appendChild(_ce('b', 'color:' + cColor + ';', cSign + change));
+                        box.appendChild(payRow);
+                    }
+                }
+                content.appendChild(box);
+            }
+            modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+        }
+
         // 计算结算数据的玩家统计
         function calculateSettlementStats(settlement) {
             if (!settlement || !settlement.players || !Array.isArray(settlement.players)) {
@@ -10423,9 +10541,15 @@ body.guest-mode .manual-score-btn {
                                 var liangGrid = _ce('div', 'display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:5px;padding-top:5px;border-top:1px solid #e6e9f4;');
                                 liangKeys.forEach(function(k) {
                                     var count = p.liangCounts[k] || 0;
-                                    var cell = _ce('div', 'text-align:center;background:white;padding:4px 2px;border-radius:4px;');
+                                    var cell = _ce('div', 'text-align:center;background:white;padding:4px 2px;border-radius:4px;' + (count > 0 ? 'cursor:pointer;' : ''));
                                     cell.appendChild(_ce('div', 'font-size:0.85rem;font-weight:700;color:#e67e22;', String(count)));
                                     cell.appendChild(_ce('div', 'font-size:0.6rem;color:#888;', liangLabels[k]));
+                                    if (count > 0) {
+                                        cell.style.cursor = 'pointer';
+                                        cell.addEventListener('click', function() {
+                                            showPlayerRoundMatches(settlement, p, 'liang' + k, liangLabels[k]);
+                                        });
+                                    }
                                     liangGrid.appendChild(cell);
                                 });
                                 card.appendChild(liangGrid);
@@ -12871,7 +12995,7 @@ body.guest-mode .manual-score-btn {
                     let html = '<div style="margin-top:14px; font-size:0.85rem; font-weight:bold; color:#555; margin-bottom:8px;">对局明细</div>';
                     s.details.forEach(d => {
                         const gs = (d.displayScore !== undefined && d.displayScore !== null) ? d.displayScore : ((d.gameScore !== undefined && d.gameScore !== null) ? d.gameScore : d.score);
-                        const sc = gs > 0 ? '#2e7d32' : (gs < 0 ? '#c62828' : '#666');
+                        const sc = gs > 0 ? '#c62828' : (gs < 0 ? '#2e7d32' : '#666');
                         const rate = d.totalRounds > 0 ? Math.round(d.winRounds / d.totalRounds * 100) : 0;
                         html += `
                         <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:1px solid #eee; border-radius:10px; margin-bottom:8px; font-size:0.85rem;">
